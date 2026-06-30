@@ -436,6 +436,12 @@ let RAW_DATA = [];
 let FILTERED = [];
 let CHARTS = {};
 
+// ============ DEFAULT CONFIG ============
+// Si el visitante no tiene URL guardada en localStorage, usa este proxy por defecto.
+// Cualquier visitante podrá ver el dashboard sin tener que configurar nada.
+// Para cambiarlo, edita esta constante y haz git push.
+const DEFAULT_PROXY_URL = 'https://script.google.com/macros/s/AKfycbwqmPo_lvx6idA6YggeBVsIdqt4gB-sU4D2Gn_b05M-Fh0AH3jLdKsoF_Il5qkya0Dy/exec';
+
 // ============ CHARTS DEFAULTS ============
 Chart.defaults.font.family = "'Outfit', sans-serif";
 Chart.defaults.color = '#64748b';
@@ -465,14 +471,35 @@ function openSourceConfig() {
   const cfg = document.getElementById('source-config');
   cfg.style.display = 'block';
   const saved = localStorage.getItem('kpi_sheet_url');
-  if (saved) document.getElementById('sheet-url').value = saved;
+  const input = document.getElementById('sheet-url');
+  if (saved) {
+    input.value = saved;
+    input.placeholder = saved;
+  } else {
+    input.placeholder = DEFAULT_PROXY_URL + '  (default)';
+  }
 }
 function closeSourceConfig() { document.getElementById('source-config').style.display = 'none'; }
 function saveSource() {
   const url = document.getElementById('sheet-url').value.trim();
-  if (url) localStorage.setItem('kpi_sheet_url', url);
+  if (url) {
+    localStorage.setItem('kpi_sheet_url', url);
+  } else {
+    // Si el usuario borra el campo y guarda, vuelve al default hardcodeado
+    localStorage.removeItem('kpi_sheet_url');
+  }
   closeSourceConfig();
   loadData(true);
+}
+
+/**
+ * Resuelve la URL de la fuente a usar:
+ *   1. localStorage (configuración del usuario)
+ *   2. DEFAULT_PROXY_URL (hardcodeado en el código)
+ *   3. null (sin fuente)
+ */
+function resolveSourceUrl() {
+  return localStorage.getItem('kpi_sheet_url') || DEFAULT_PROXY_URL || null;
 }
 
 // ============ LOAD DATA ============
@@ -480,7 +507,7 @@ async function loadData(force = false) {
   const refreshIcon = document.getElementById('refresh-icon');
   refreshIcon.style.animation = 'spin 0.8s linear infinite';
 
-  const url = localStorage.getItem('kpi_sheet_url');
+  const url = resolveSourceUrl();
   if (url && (force || RAW_DATA.length === 0)) {
     let loaded = false;
     // Primer intento: cache-busting reforzado con retry exponencial
