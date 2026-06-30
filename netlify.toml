@@ -1,0 +1,40 @@
+# =============================================================
+# Netlify configuration for LICMAN KPI Dashboard
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+# =============================================================
+
+[build]
+  publish = "."
+
+# No build step required — static HTML/CSS/JS site
+# Netlify serves index.html at the root URL automatically
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Cache agresivo para assets estáticos que cambian poco
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# Permitir cross-origin solo para fonts (Tailwind y Google Fonts cargan vía CDN)
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"

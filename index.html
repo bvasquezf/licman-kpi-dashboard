@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LICMAN — Dashboard KPI Mantenimiento</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+  body { font-family: 'Outfit', sans-serif; background: #f4f6fa; }
+  .kpi-card { background: white; border-radius: 14px; box-shadow: 0 2px 8px rgba(15,23,42,0.04); border: 1px solid rgba(15,23,42,0.04); transition: all .2s ease; }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(15,23,42,0.06); }
+  .panel { background: white; border-radius: 14px; box-shadow: 0 2px 8px rgba(15,23,42,0.04); border: 1px solid rgba(15,23,42,0.04); }
+  .tab-btn.active { background: #2563eb; color: white; box-shadow: 0 2px 8px rgba(37,99,235,0.25); }
+  .tab-btn { transition: all .15s ease; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; display: inline-block; }
+  .badge-red { background: #fef2f2; color: #b91c1c; }
+  .badge-amber { background: #fffbeb; color: #b45309; }
+  .badge-green { background: #ecfdf5; color: #047857; }
+  .badge-blue { background: #eff6ff; color: #1d4ed8; }
+  .badge-gray { background: #f1f5f9; color: #475569; }
+  .slicer { background: white; border: 1px solid #e2e8f0; padding: 6px 12px; border-radius: 8px; font-size: 13px; color: #475569; cursor: pointer; }
+  .slicer:hover { border-color: #2563eb; }
+  .repeating-bar { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+  .repeating-bar > div { height: 100%; background: linear-gradient(90deg, #f43f5e, #fb7185); border-radius: 4px; }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; background: #f8fafc; }
+  td { font-size: 13px; padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
+  tr:hover td { background: #f8fafc; }
+  .topbar { background: white; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 30; }
+  .filter-bar { background: white; border-bottom: 1px solid #e2e8f0; padding: 12px 0; position: sticky; top: 64px; z-index: 25; }
+  .filter-bar select { background: white; border: 1px solid #cbd5e1; padding: 6px 28px 6px 12px; border-radius: 8px; font-size: 13px; color: #1e293b; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3e%3cpath d='M6 9l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 16px; }
+  .filter-bar select:hover { border-color: #2563eb; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .alert-box { background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%); border: 1px solid #fecdd3; border-radius: 14px; padding: 20px; }
+  .source-config { background: #fefce8; border: 1px dashed #facc15; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+  .source-config code { background: #fde68a; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .source-config button { background: #ca8a04; color: white; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
+  .source-config button:hover { background: #a16207; }
+  .source-config input { background: white; border: 1px solid #fde047; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-family: 'JetBrains Mono', monospace; width: 320px; }
+  .last-update { font-size: 11px; color: #94a3b8; }
+  /* Prevenir zoom de doble tap en iOS al tocar botones */
+  button, .tab-btn, .slicer, select { touch-action: manipulation; }
+
+  /* === RESPONSIVE: charts === */
+  .chart-wrap { position: relative; width: 100%; height: 260px; }
+  .chart-wrap canvas { max-height: 100%; }
+
+  /* === RESPONSIVE: tabs scroll horizontal en móvil === */
+  .tabs-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .tabs-scroll::-webkit-scrollbar { height: 3px; }
+  .tabs-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+  /* === RESPONSIVE: media queries === */
+  @media (max-width: 768px) {
+    .max-w-\[1500px\] { padding-left: 14px !important; padding-right: 14px !important; }
+    .kpi-card, .panel, .alert-box { padding: 14px !important; }
+    .kpi-card .text-3xl { font-size: 1.5rem !important; line-height: 1.85rem !important; }
+    .tab-btn { padding: 0.55rem 0.85rem !important; font-size: 0.78rem !important; white-space: nowrap; }
+    .filter-bar select, .slicer { font-size: 12px !important; padding: 5px 24px 5px 10px !important; }
+    .chart-wrap { height: 230px; }
+    .alert-box .w-12 { width: 2.5rem !important; height: 2.5rem !important; }
+    .alert-box svg { width: 20px !important; height: 20px !important; }
+    .topbar { position: relative !important; }
+    .filter-bar { position: relative !important; top: 0 !important; }
+  }
+  @media (max-width: 480px) {
+    body { font-size: 13px; }
+    .topbar h1 { font-size: 0.95rem !important; }
+    .topbar .text-xs { font-size: 10px !important; }
+    .kpi-card .text-3xl { font-size: 1.25rem !important; line-height: 1.65rem !important; }
+    .kpi-card .text-xs, .panel .text-xs { font-size: 10px !important; }
+    th { font-size: 10px !important; padding: 8px !important; }
+    td { font-size: 12px !important; padding: 8px !important; }
+    .chart-wrap { height: 200px; }
+    .hide-on-tiny { display: none !important; }
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="max-w-[1500px] mx-auto px-4 md:px-8 py-3 md:py-4 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3 md:gap-4 min-w-0">
+      <!-- Logo LICMAN -->
+      <div id="logo-container" class="h-12 md:h-16 px-3 md:px-4 py-2 rounded-xl bg-white flex items-center justify-center overflow-hidden border border-slate-200 shadow-sm flex-shrink-0">
+        <img id="company-logo" src="logo.svg" alt="LICMAN" class="h-9 md:h-[54px] w-auto object-contain" style="display:block;">
+      </div>
+      <div class="min-w-0">
+        <h1 class="text-base md:text-lg font-semibold text-slate-900 leading-tight truncate">LICMAN — Dashboard KPI Mantenimiento</h1>
+        <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+          <p class="text-xs text-slate-500">OTs + Informes Terreno · </p>
+          <p class="text-xs font-medium text-blue-700 flex items-center gap-1">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span id="last-update">Cargando...</span>
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="slicer flex items-center gap-2 text-xs">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span class="hidden sm:inline">Auto-refresh </span>2 min
+      </span>
+      <button id="refresh-btn" onclick="loadData(true)" class="slicer flex items-center gap-2">
+        <svg id="refresh-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6"/><path d="M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3"/><path d="M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        <span>Actualizar</span>
+      </button>
+      <button onclick="openSourceConfig()" class="slicer flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="hidden sm:inline">Configurar fuente</span>
+        <span class="sm:hidden">Config</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Source config (hidden by default) -->
+  <div id="source-config" class="source-config" style="display:none;">
+    <div class="max-w-[1500px] mx-auto px-4 md:px-8 flex items-center gap-3 flex-wrap">
+      <strong class="text-xs md:text-sm">URL de la fuente (Sheet CSV directo o Apps Script Proxy):</strong>
+      <input id="sheet-url" type="text" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0  ó  https://script.google.com/macros/s/.../exec">
+      <button onclick="saveSource()">Guardar y actualizar</button>
+      <button onclick="closeSourceConfig()" style="background:#94a3b8;">Cancelar</button>
+      <a href="README_PROXY.md" target="_blank" style="margin-left:auto; color:#854d0e; text-decoration:underline;">¿Cómo configurar el proxy? →</a>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="max-w-[1500px] mx-auto px-4 md:px-8 mt-2">
+    <div class="tabs-scroll">
+      <div class="flex gap-1 min-w-max">
+        <button class="tab-btn active px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium" data-tab="resumen">📊 Resumen Ejecutivo</button>
+        <button class="tab-btn px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-100" data-tab="tecnicos">👷 Desempeño por Técnico</button>
+        <button class="tab-btn px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-100" data-tab="reincidencia">🚨 Reincidencia y Calidad</button>
+        <button class="tab-btn px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-100" data-tab="tiempos">⏱️ Análisis de Tiempos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <div class="max-w-[1500px] mx-auto px-4 md:px-8 flex items-center gap-2 md:gap-3 flex-wrap">
+    <span class="text-xs font-medium text-slate-500 uppercase tracking-wide mr-2 hidden sm:inline">Filtros:</span>
+    <select id="filter-tecnico" class="text-xs md:text-sm"><option value="">Todos los técnicos</option></select>
+    <select id="filter-cliente" class="text-xs md:text-sm"><option value="">Todos los clientes</option></select>
+    <select id="filter-fuente" class="text-xs md:text-sm"><option value="">Todas las fuentes</option><option value="OT Taller">OT Taller</option><option value="Informe Terreno">Informe Terreno</option></select>
+    <select id="filter-periodo" class="text-xs md:text-sm"><option value="">Todos los períodos</option></select>
+    <button onclick="resetFilters()" class="text-xs text-blue-600 hover:underline ml-2">Limpiar filtros</button>
+    <div class="ml-auto flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span id="data-status" class="text-xs font-medium text-emerald-800">Conectando...</span>
+    </div>
+  </div>
+</div>
+
+<div class="max-w-[1500px] mx-auto px-4 md:px-8 py-4 md:py-6">
+
+<!-- ============= TAB 1: RESUMEN EJECUTIVO ============= -->
+<div class="tab-content active" id="tab-resumen">
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
+    <div class="kpi-card p-5">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Actividades</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <div class="text-3xl font-bold text-slate-900" id="kpi-total">—</div>
+      <div class="text-xs text-slate-500 mt-1" id="kpi-total-sub">—</div>
+    </div>
+
+    <div class="kpi-card p-5">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">% Preventivas</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="text-3xl font-bold text-emerald-600" id="kpi-preventivas">—</div>
+      <div class="text-xs text-slate-500 mt-1" id="kpi-preventivas-sub">—</div>
+    </div>
+
+    <div class="kpi-card p-5">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">% Correctivas</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      </div>
+      <div class="text-3xl font-bold text-amber-600" id="kpi-correctivas">—</div>
+      <div class="text-xs text-slate-500 mt-1" id="kpi-correctivas-sub">—</div>
+    </div>
+
+    <div class="kpi-card p-5">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Reincidencia Promedio</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M21.5 2v6h-6"/><path d="M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3"/><path d="M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+      </div>
+      <div class="text-3xl font-bold text-rose-600" id="kpi-reinc">—</div>
+      <div class="text-xs text-slate-500 mt-1">visitas promedio por equipo</div>
+    </div>
+
+    <div class="kpi-card p-5 border-rose-200 bg-rose-50/30">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-medium text-rose-700 uppercase tracking-wide">🚨 Equipos Críticos</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="text-3xl font-bold text-rose-700" id="kpi-criticos">—</div>
+      <div class="text-xs text-rose-600 mt-1">equipos con más de 3 visitas</div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 mb-6">
+    <div class="panel p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-slate-800">Distribución Tipo de Trabajo</h3>
+        <span class="badge badge-blue" id="kpi-tipo-total">—</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-tipo"></canvas></div>
+    </div>
+
+    <div class="panel p-5 lg:col-span-2">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-slate-800">Actividad por Técnico</h3>
+        <span class="badge badge-gray">Top performers</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-tecnicos"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 mb-6">
+    <div class="panel p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-slate-800">Tendencia Mensual de Actividades</h3>
+        <span class="badge badge-gray">Últimos meses</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-mensual"></canvas></div>
+    </div>
+
+    <div class="panel p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-slate-800">Tipos de Falla más Frecuentes</h3>
+        <span class="badge badge-gray" id="kpi-fallas-total">—</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chart-fallas"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-slate-800">Top 8 Clientes con más Actividad</h3>
+      <span class="badge badge-gray">Excluye OT Taller</span>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-clientes"></canvas></div>
+  </div>
+
+</div>
+
+<!-- ============= TAB 2: DESEMPEÑO POR TÉCNICO ============= -->
+<div class="tab-content" id="tab-tecnicos">
+
+  <div class="panel p-5 mb-6">
+    <h3 class="text-sm font-semibold text-slate-800 mb-4">Productividad por Técnico</h3>
+    <div style="overflow-x:auto;">
+      <table id="table-tecnicos">
+        <thead>
+          <tr>
+            <th>Técnico</th>
+            <th>Especialidad</th>
+            <th class="text-right">Total</th>
+            <th class="text-right">Preventivas</th>
+            <th class="text-right">Correctivas</th>
+            <th class="text-right">Diagnóstico</th>
+            <th class="text-right">% Operativo</th>
+            <th class="text-right">Reincid. Promedio</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="panel p-5">
+      <h3 class="text-sm font-semibold text-slate-800 mb-4">Mix de Trabajo por Técnico (Top 5)</h3>
+      <div class="chart-wrap"><canvas id="chart-mix"></canvas></div>
+    </div>
+    <div class="panel p-5">
+      <h3 class="text-sm font-semibold text-slate-800 mb-4">Estado Final por Técnico</h3>
+      <div class="chart-wrap"><canvas id="chart-estado"></canvas></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============= TAB 3: REINCIDENCIA Y CALIDAD ============= -->
+<div class="tab-content" id="tab-reincidencia">
+
+  <div class="alert-box mb-6" id="alert-box">
+    <div class="flex items-start gap-4">
+      <div class="w-12 h-12 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div>
+        <h3 class="text-base font-semibold text-rose-900 mb-1" id="alert-title">Cargando...</h3>
+        <p class="text-sm text-rose-700" id="alert-text">—</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+    <div class="kpi-card p-5">
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Equipos Únicos</span>
+      <div class="text-3xl font-bold text-slate-900 mt-2" id="kpi-equipos-unicos">—</div>
+    </div>
+    <div class="kpi-card p-5">
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Normal (1 visita)</span>
+      <div class="text-3xl font-bold text-emerald-600 mt-2" id="kpi-normales">—</div>
+      <div class="text-xs text-slate-500 mt-1" id="kpi-normales-sub">—</div>
+    </div>
+    <div class="kpi-card p-5">
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Alerta (2-3 visitas)</span>
+      <div class="text-3xl font-bold text-amber-600 mt-2" id="kpi-alerta">—</div>
+      <div class="text-xs text-slate-500 mt-1" id="kpi-alerta-sub">—</div>
+    </div>
+    <div class="kpi-card p-5">
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Crítico (>3 visitas)</span>
+      <div class="text-3xl font-bold text-rose-600 mt-2" id="kpi-criticos-2">—</div>
+      <div class="text-xs text-slate-500 mt-1" id="kpi-criticos-2-sub">—</div>
+    </div>
+  </div>
+
+  <div class="panel p-5 mb-6">
+    <h3 class="text-sm font-semibold text-slate-800 mb-4">Top 10 Equipos con Mayor Reincidencia</h3>
+    <div style="overflow-x:auto;">
+      <table id="table-reincidencia">
+        <thead>
+          <tr>
+            <th>Equipo</th>
+            <th>Cliente</th>
+            <th>Marca</th>
+            <th class="text-right">Visitas</th>
+            <th class="text-right">Reincidencia</th>
+            <th>Indicador</th>
+            <th class="text-center">Estado</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="panel p-5">
+      <h3 class="text-sm font-semibold text-slate-800 mb-4">Distribución de Reincidencia por Cliente</h3>
+      <div class="chart-wrap"><canvas id="chart-reinc-cliente"></canvas></div>
+    </div>
+    <div class="panel p-5">
+      <h3 class="text-sm font-semibold text-slate-800 mb-4">Frecuencia de Fallas en Equipos Críticos</h3>
+      <div class="chart-wrap"><canvas id="chart-fallas-criticas"></canvas></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============= TAB 4: ANÁLISIS DE TIEMPOS ============= -->
+<div class="tab-content" id="tab-tiempos">
+
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2" class="flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    <div class="text-sm text-blue-900">
+      <strong>Nota:</strong> Las horas y días trabajados solo están disponibles en OT Taller (32 registros). Los Informes Terreno no registran duración, solo fecha de servicio.
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+    <div class="kpi-card p-5">
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">OTs Taller Analizadas</span>
+      <div class="text-3xl font-bold text-slate-900 mt-2" id="kpi-ots">—</div>
+    </div>
+    <div class="kpi-card p-5">
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Duración Promedio</span>
+      <div class="text-3xl font-bold text-blue-600 mt-2" id="kpi-duracion">—</div>
+    </div>
+    <div class="kpi-card p-5">
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Horas Promedio</span>
+      <div class="text-3xl font-bold text-blue-600 mt-2" id="kpi-horas">—</div>
+    </div>
+    <div class="kpi-card p-5">
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">OT más larga</span>
+      <div class="text-3xl font-bold text-rose-600 mt-2" id="kpi-ot-larga">—</div>
+      <div class="text-xs text-slate-500 mt-1" id="kpi-ot-larga-sub">—</div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 mb-6">
+    <div class="panel p-5">
+      <h3 class="text-sm font-semibold text-slate-800 mb-4">Duración Promedio por Técnico (OT Taller)</h3>
+      <div class="chart-wrap"><canvas id="chart-duracion"></canvas></div>
+    </div>
+    <div class="panel p-5">
+      <h3 class="text-sm font-semibold text-slate-800 mb-4">Distribución de Duración de OTs</h3>
+      <div class="chart-wrap"><canvas id="chart-dist-duracion"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel p-5">
+    <h3 class="text-sm font-semibold text-slate-800 mb-4">Detalle de OTs por Técnico</h3>
+    <div style="overflow-x:auto;">
+      <table id="table-tiempos">
+        <thead>
+          <tr>
+            <th>Técnico</th>
+            <th class="text-right">OTs</th>
+            <th class="text-right">Días Promedio</th>
+            <th class="text-right">Horas Promedio</th>
+            <th class="text-right">Total Horas</th>
+            <th class="text-right">OT más larga</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+</div>
+
+<!-- ============= SCRIPTS ============= -->
+<script>
+// ============ GLOBAL STATE ============
+let RAW_DATA = [];
+let FILTERED = [];
+let CHARTS = {};
+
+// ============ CHARTS DEFAULTS ============
+Chart.defaults.font.family = "'Outfit', sans-serif";
+Chart.defaults.color = '#64748b';
+Chart.defaults.borderColor = 'rgba(15,23,42,0.06)';
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+// Responsive: que los charts se ajusten al contenedor .chart-wrap en vez de mantener aspect ratio fijo
+Chart.defaults.responsive = true;
+Chart.defaults.maintainAspectRatio = false;
+
+// ============ TAB SWITCHING ============
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => { if (!b.classList.contains('active')) b.classList.add('text-slate-600'); });
+    btn.classList.add('active');
+    btn.classList.remove('text-slate-600');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + target).classList.add('active');
+    // Resize charts when tab becomes visible
+    setTimeout(() => { Object.values(CHARTS).forEach(c => c && c.resize && c.resize()); }, 50);
+  });
+});
+
+// ============ SOURCE CONFIG ============
+function openSourceConfig() {
+  const cfg = document.getElementById('source-config');
+  cfg.style.display = 'block';
+  const saved = localStorage.getItem('kpi_sheet_url');
+  if (saved) document.getElementById('sheet-url').value = saved;
+}
+function closeSourceConfig() { document.getElementById('source-config').style.display = 'none'; }
+function saveSource() {
+  const url = document.getElementById('sheet-url').value.trim();
+  if (url) localStorage.setItem('kpi_sheet_url', url);
+  closeSourceConfig();
+  loadData(true);
+}
+
+// ============ LOAD DATA ============
+async function loadData(force = false) {
+  const refreshIcon = document.getElementById('refresh-icon');
+  refreshIcon.style.animation = 'spin 0.8s linear infinite';
+
+  const url = localStorage.getItem('kpi_sheet_url');
+  if (url && (force || RAW_DATA.length === 0)) {
+    let loaded = false;
+    // Primer intento: cache-busting reforzado con retry exponencial
+    try {
+      const separator = url.includes('?') ? '&' : '?';
+      const freshUrl = url + separator + '_t=' + Date.now() + '_r=' + Math.random().toString(36).slice(2);
+      const resp = await fetchWithRetry(freshUrl, { cache: 'no-store' }, 3);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const csvText = await resp.text();
+      const parsed = parseCsvWithMetadata(csvText);
+      RAW_DATA = parsed.data;
+      updateStatusFromLoad_(parsed, 'live');
+      loaded = true;
+    } catch (err) {
+      console.warn('Primer intento falló:', err);
+      // Segundo intento: cache-busting simple tras 2s
+      document.getElementById('data-status').textContent = '⚠ Reintentando...';
+      try {
+        await new Promise(r => setTimeout(r, 2000));
+        const separator = url.includes('?') ? '&' : '?';
+        const freshUrl = url + separator + '_t=' + Date.now();
+        const resp = await fetch(freshUrl, { cache: 'no-store' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const csvText = await resp.text();
+        const parsed = parseCsvWithMetadata(csvText);
+        RAW_DATA = parsed.data;
+        updateStatusFromLoad_(parsed, 'live');
+        loaded = true;
+      } catch (err2) {
+        console.error('Segundo intento falló:', err2);
+      }
+    }
+    if (!loaded) {
+      document.getElementById('data-status').textContent = '⚠ Error al cargar fuente, usando datos locales';
+      await loadFallback();
+    }
+  } else if (RAW_DATA.length === 0) {
+    await loadFallback();
+  }
+
+  refreshIcon.style.animation = '';
+  applyFilters();
+  populateFilterOptions();
+  renderAll();
+}
+
+// Helper: actualiza el badge de estado con datos del servidor si están disponibles
+function updateStatusFromLoad_(parsed, source) {
+  const localTime = new Date().toLocaleTimeString();
+  let text = `✓ Datos en vivo · ${parsed.data.length} registros · actualizado ${localTime}`;
+  if (parsed.metadata && parsed.metadata.serverTimestamp) {
+    try {
+      const serverTime = new Date(parsed.metadata.serverTimestamp);
+      text += ` · servidor ${serverTime.toLocaleTimeString()}`;
+    } catch (e) { /* ignore */ }
+  }
+  if (parsed.metadata && parsed.metadata.sheetName) {
+    text += ` · hoja "${parsed.metadata.sheetName}"`;
+  }
+  if (source === 'fallback') {
+    text = `📁 Datos locales (fallback) · ${parsed.data.length} registros · configura tu fuente`;
+  }
+  document.getElementById('data-status').textContent = text;
+}
+
+// Helper: fetch con retry exponencial (solo para errores de red / 5xx)
+async function fetchWithRetry(url, options, maxRetries) {
+  let lastErr;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const resp = await fetch(url, options);
+      // 2xx → éxito; 4xx → no retry (error de config); 5xx → retry
+      if (resp.ok) return resp;
+      if (resp.status >= 400 && resp.status < 500) return resp;
+      lastErr = new Error('HTTP ' + resp.status);
+    } catch (err) {
+      lastErr = err;
+    }
+    if (i < maxRetries - 1) {
+      const delay = 1000 * (i + 1); // 1s, 2s, 3s
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
+// Helper: parsea CSV y extrae metadata de Apps Script si está presente
+// La metadata viene como última línea tipo: # {"serverTimestamp":"...","rowCount":N}
+function parseCsvWithMetadata(csvText) {
+  const lines = csvText.split(/\r?\n/);
+  let metadata = null;
+  let lastNonEmpty = lines.length - 1;
+  while (lastNonEmpty >= 0 && lines[lastNonEmpty].trim() === '') lastNonEmpty--;
+
+  if (lastNonEmpty >= 0) {
+    const lastLine = lines[lastNonEmpty].trim();
+    if (lastLine.startsWith('# {')) {
+      try {
+        metadata = JSON.parse(lastLine.substring(2));
+      } catch (e) { /* no es metadata válida */ }
+    }
+  }
+
+  const csvLines = metadata ? lines.slice(0, lastNonEmpty) : lines;
+  const cleanCsv = csvLines.join('\n');
+  const result = Papa.parse(cleanCsv, {
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+  });
+  return { data: result.data, metadata };
+}
+
+// Helper: escape HTML para prevenir XSS al renderizar celdas del Sheet en el DOM
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ============ LOAD FALLBACK ============
+async function loadFallback() {
+  try {
+    const resp = await fetch('data_fallback.json');
+    if (!resp.ok) throw new Error('fallback not found');
+    const fallback = await resp.json();
+    RAW_DATA = fallback;
+    updateStatusFromLoad_({ data: fallback }, 'fallback');
+  } catch (err) {
+    document.getElementById('data-status').textContent = '⚠ No se pudieron cargar datos';
+    RAW_DATA = [];
+  }
+}
+
+// ============ FILTERS ============
+function populateFilterOptions() {
+  const tecnicos = [...new Set(RAW_DATA.map(r => r['Técnico']).filter(Boolean))].sort();
+  const clientes = [...new Set(RAW_DATA.map(r => r['Cliente']).filter(Boolean))].sort();
+  const periodos = [...new Set(RAW_DATA.map(r => r['Periodo']).filter(Boolean))].sort();
+
+  const fillSelect = (id, options, allLabel) => {
+    const sel = document.getElementById(id);
+    const current = sel.value;
+    sel.innerHTML = `<option value="">${allLabel}</option>` + options.map(o => `<option value="${o}">${o}</option>`).join('');
+    sel.value = current;
+  };
+  fillSelect('filter-tecnico', tecnicos, 'Todos los técnicos');
+  fillSelect('filter-cliente', clientes, 'Todos los clientes');
+  fillSelect('filter-periodo', periodos, 'Todos los períodos');
+
+  // Re-attach listeners (cloning to remove old)
+  ['filter-tecnico', 'filter-cliente', 'filter-fuente', 'filter-periodo'].forEach(id => {
+    const el = document.getElementById(id);
+    const newEl = el.cloneNode(true);
+    el.parentNode.replaceChild(newEl, el);
+    newEl.addEventListener('change', applyFilters);
+  });
+}
+
+function applyFilters() {
+  const tecnico = document.getElementById('filter-tecnico').value;
+  const cliente = document.getElementById('filter-cliente').value;
+  const fuente = document.getElementById('filter-fuente').value;
+  const periodo = document.getElementById('filter-periodo').value;
+
+  FILTERED = RAW_DATA.filter(r => {
+    if (tecnico && r['Técnico'] !== tecnico) return false;
+    if (cliente && r['Cliente'] !== cliente) return false;
+    if (fuente && r['Fuente'] !== fuente) return false;
+    if (periodo && r['Periodo'] !== periodo) return false;
+    return true;
+  });
+
+  document.getElementById('last-update').textContent = `${FILTERED.length} de ${RAW_DATA.length} registros`;
+  renderAll();
+}
+
+function resetFilters() {
+  ['filter-tecnico', 'filter-cliente', 'filter-fuente', 'filter-periodo'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  applyFilters();
+}
+
+// ============ RENDER ALL ============
+function renderAll() {
+  if (FILTERED.length === 0) return;
+  renderKPIs();
+  renderCharts();
+  renderTables();
+}
+
+// ============ KPIs ============
+function renderKPIs() {
+  const total = FILTERED.length;
+  const preventivas = FILTERED.filter(r => r['Tipo_Trabajo_Final'] === 'Mantención/Preventiva').length;
+  const correctivas = FILTERED.filter(r => r['Tipo_Trabajo_Final'] === 'Correctiva').length;
+  const otsTaller = FILTERED.filter(r => r['Fuente'] === 'OT Taller').length;
+  const informesTerreno = FILTERED.filter(r => r['Fuente'] === 'Informe Terreno').length;
+  const reincidencias = FILTERED.map(r => r['Reincidencia_Equipo']).filter(v => v != null && !isNaN(v));
+  const reincPromedio = reincidencias.length ? (reincidencias.reduce((a,b)=>a+b,0)/reincidencias.length) : 0;
+  const equiposCriticos = new Set(FILTERED.filter(r => r['Reincidencia_Equipo'] >= 4).map(r => r['Equipo'])).size;
+
+  document.getElementById('kpi-total').textContent = total;
+  document.getElementById('kpi-total-sub').textContent = `${otsTaller} OTs + ${informesTerreno} Informes Terreno`;
+  document.getElementById('kpi-preventivas').textContent = total ? (preventivas*100/total).toFixed(1) + '%' : '—';
+  document.getElementById('kpi-preventivas-sub').textContent = `${preventivas} OTs de mantenimiento preventivo`;
+  document.getElementById('kpi-correctivas').textContent = total ? (correctivas*100/total).toFixed(1) + '%' : '—';
+  document.getElementById('kpi-correctivas-sub').textContent = `${correctivas} OTs correctivas (alta carga)`;
+  document.getElementById('kpi-reinc').textContent = reincPromedio.toFixed(2);
+  document.getElementById('kpi-criticos').textContent = equiposCriticos;
+
+  // Reincidencia cards
+  const equiposCounts = {};
+  FILTERED.forEach(r => {
+    if (r['Equipo'] != null) {
+      const k = r['Equipo'];
+      if (!equiposCounts[k] || r['Reincidencia_Equipo'] > equiposCounts[k]) equiposCounts[k] = r['Reincidencia_Equipo'];
+    }
+  });
+  const normales = Object.values(equiposCounts).filter(v => v === 1).length;
+  const alerta = Object.values(equiposCounts).filter(v => v >= 2 && v <= 3).length;
+  const criticos = Object.values(equiposCounts).filter(v => v >= 4).length;
+  const totalEquipos = Object.keys(equiposCounts).length;
+
+  document.getElementById('kpi-equipos-unicos').textContent = totalEquipos;
+  document.getElementById('kpi-normales').textContent = normales;
+  document.getElementById('kpi-normales-sub').textContent = totalEquipos ? `${(normales*100/totalEquipos).toFixed(1)}% de los equipos` : '—';
+  document.getElementById('kpi-alerta').textContent = alerta;
+  document.getElementById('kpi-alerta-sub').textContent = totalEquipos ? `${(alerta*100/totalEquipos).toFixed(1)}% requiere seguimiento` : '—';
+  document.getElementById('kpi-criticos-2').textContent = criticos;
+  document.getElementById('kpi-criticos-2-sub').textContent = totalEquipos ? `${(criticos*100/totalEquipos).toFixed(1)}% foco prioritario` : '—';
+
+  // Alert box
+  const equipoMasCritico = Object.entries(equiposCounts).sort((a,b) => b[1] - a[1])[0];
+  if (equipoMasCritico && equipoMasCritico[1] >= 4) {
+    const eq = equipoMasCritico[0];
+    const reinc = equipoMasCritico[1];
+    const cliente = FILTERED.find(r => r['Equipo'] == eq && r['Cliente'])?.['Cliente'] || 'Sin cliente';
+    document.getElementById('alert-title').textContent = `Equipo ${eq} — ${cliente}: foco crítico de reincidencia`;
+    document.getElementById('alert-text').innerHTML = `Ha requerido <strong>${reinc} visitas</strong>. Concentra <strong>${(reinc*100/total).toFixed(1)}%</strong> de toda la actividad técnica. Evaluar mantenimiento profundo o reemplazo.`;
+  } else {
+    document.getElementById('alert-box').style.display = 'none';
+  }
+
+  // Tiempos
+  const otsConHoras = FILTERED.filter(r => r['Fuente'] === 'OT Taller' && r['Horas_Trabajadas'] != null);
+  const otsConDias = FILTERED.filter(r => r['Fuente'] === 'OT Taller' && r['Días_Trabajados'] != null);
+  const durProm = otsConDias.length ? otsConDias.reduce((a,b)=>a+b['Días_Trabajados'],0)/otsConDias.length : 0;
+  const horProm = otsConHoras.length ? otsConHoras.reduce((a,b)=>a+b['Horas_Trabajadas'],0)/otsConHoras.length : 0;
+  const otMasLarga = otsConDias.length ? Math.max(...otsConDias.map(r => r['Días_Trabajados'])) : 0;
+  const otMasLargaHoras = otsConDias.find(r => r['Días_Trabajados'] === otMasLarga)?.['Horas_Trabajadas'] || 0;
+
+  document.getElementById('kpi-ots').textContent = otsConHoras.length;
+  document.getElementById('kpi-duracion').textContent = durProm.toFixed(1) + ' días';
+  document.getElementById('kpi-horas').textContent = horProm.toFixed(1) + ' h';
+  document.getElementById('kpi-ot-larga').textContent = otMasLarga + ' días';
+  document.getElementById('kpi-ot-larga-sub').textContent = `${otMasLargaHoras.toFixed(1)} horas trabajadas`;
+}
+
+// ============ CHARTS ============
+function destroyChart(id) { if (CHARTS[id]) { CHARTS[id].destroy(); CHARTS[id] = null; } }
+
+function renderCharts() {
+  // Tipo trabajo
+  destroyChart('chart-tipo');
+  const tipoCount = {};
+  FILTERED.forEach(r => { const t = r['Tipo_Trabajo_Final']; if (t) tipoCount[t] = (tipoCount[t]||0)+1; });
+  document.getElementById('kpi-tipo-total').textContent = `Total: ${FILTERED.length}`;
+  CHARTS['chart-tipo'] = new Chart(document.getElementById('chart-tipo'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(tipoCount),
+      datasets: [{ data: Object.values(tipoCount), backgroundColor: ['#f59e0b', '#3b82f6', '#10b981', '#94a3b8', '#06b6d4'], borderWidth: 0 }]
+    },
+    options: { cutout: '65%', plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 12 } } } } }
+  });
+
+  // Tecnicos
+  destroyChart('chart-tecnicos');
+  const tecCount = {};
+  FILTERED.forEach(r => { const t = r['Técnico']; if (t) tecCount[t] = (tecCount[t]||0)+1; });
+  const tecSorted = Object.entries(tecCount).sort((a,b) => b[1]-a[1]);
+  CHARTS['chart-tecnicos'] = new Chart(document.getElementById('chart-tecnicos'), {
+    type: 'bar',
+    data: { labels: tecSorted.map(t => t[0]), datasets: [{ label: 'Total', data: tecSorted.map(t => t[1]), backgroundColor: '#3b82f6', borderRadius: 6 }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } } } }
+  });
+
+  // Mensual
+  destroyChart('chart-mensual');
+  const monthCounts = {};
+  FILTERED.forEach(r => {
+    const fecha = r['Fecha_Servicio'] || r['Fecha_Inicio'];
+    if (fecha) {
+      const d = new Date(fecha);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const label = d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+      if (!monthCounts[key]) monthCounts[key] = { label, OT: 0, Terreno: 0 };
+      if (r['Fuente'] === 'OT Taller') monthCounts[key].OT++;
+      else if (r['Fuente'] === 'Informe Terreno') monthCounts[key].Terreno++;
+    }
+  });
+  const sortedMonths = Object.entries(monthCounts).sort((a,b) => a[0].localeCompare(b[0]));
+  CHARTS['chart-mensual'] = new Chart(document.getElementById('chart-mensual'), {
+    type: 'line',
+    data: {
+      labels: sortedMonths.map(m => m[1].label),
+      datasets: [
+        { label: 'OT Taller', data: sortedMonths.map(m => m[1].OT), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.35, fill: true },
+        { label: 'Informe Terreno', data: sortedMonths.map(m => m[1].Terreno), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.35, fill: true }
+      ]
+    },
+    options: { plugins: { legend: { position: 'top', align: 'end' } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  // Fallas
+  destroyChart('chart-fallas');
+  const fallaCount = {};
+  FILTERED.forEach(r => { const f = r['Tipo_Falla_Final']; if (f) fallaCount[f] = (fallaCount[f]||0)+1; });
+  document.getElementById('kpi-fallas-total').textContent = `Total: ${FILTERED.length}`;
+  CHARTS['chart-fallas'] = new Chart(document.getElementById('chart-fallas'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(fallaCount),
+      datasets: [{ data: Object.values(fallaCount), backgroundColor: ['#3b82f6', '#06b6d4', '#94a3b8', '#f59e0b', '#ef4444'], borderRadius: 6 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  // Clientes top 8
+  destroyChart('chart-clientes');
+  const cliCount = {};
+  FILTERED.forEach(r => { if (r['Fuente'] === 'Informe Terreno' && r['Cliente']) cliCount[r['Cliente']] = (cliCount[r['Cliente']]||0)+1; });
+  const cliSorted = Object.entries(cliCount).sort((a,b) => b[1]-a[1]).slice(0,8);
+  CHARTS['chart-clientes'] = new Chart(document.getElementById('chart-clientes'), {
+    type: 'bar',
+    data: { labels: cliSorted.map(c => c[0]), datasets: [{ data: cliSorted.map(c => c[1]), backgroundColor: '#6366f1', borderRadius: 6 }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  // Mix
+  destroyChart('chart-mix');
+  const tecTipos = {};
+  FILTERED.forEach(r => {
+    const t = r['Técnico']; const tipo = r['Tipo_Trabajo_Final'];
+    if (t && tipo) {
+      if (!tecTipos[t]) tecTipos[t] = { 'Mantención/Preventiva': 0, 'Correctiva': 0, 'Diagnóstico/Revisión': 0 };
+      if (tecTipos[t][tipo] !== undefined) tecTipos[t][tipo]++;
+    }
+  });
+  const tecTop5 = Object.entries(tecTipos).map(([k,v]) => ({k, total: Object.values(v).reduce((a,b)=>a+b,0), ...v})).sort((a,b) => b.total - a.total).slice(0,5);
+  CHARTS['chart-mix'] = new Chart(document.getElementById('chart-mix'), {
+    type: 'bar',
+    data: {
+      labels: tecTop5.map(t => t.k),
+      datasets: [
+        { label: 'Preventiva', data: tecTop5.map(t => t['Mantención/Preventiva']||0), backgroundColor: '#10b981', borderRadius: 4, stack: 's' },
+        { label: 'Correctiva', data: tecTop5.map(t => t['Correctiva']||0), backgroundColor: '#f59e0b', borderRadius: 4, stack: 's' },
+        { label: 'Diagnóstico', data: tecTop5.map(t => t['Diagnóstico/Revisión']||0), backgroundColor: '#3b82f6', borderRadius: 4, stack: 's' },
+      ]
+    },
+    options: { plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true } } }
+  });
+
+  // Estado por técnico
+  destroyChart('chart-estado');
+  const tecEstado = {};
+  FILTERED.forEach(r => {
+    const t = r['Técnico']; const est = r['Estado_Final'];
+    if (t && est) {
+      if (!tecEstado[t]) tecEstado[t] = { 'Operativo': 0, 'Pendiente/Observación': 0, 'No informado': 0 };
+      if (tecEstado[t][est] !== undefined) tecEstado[t][est]++;
+    }
+  });
+  const tecEstadoTop = Object.entries(tecEstado).map(([k,v]) => ({k, total: Object.values(v).reduce((a,b)=>a+b,0), ...v})).sort((a,b) => b.total - a.total).slice(0,5);
+  CHARTS['chart-estado'] = new Chart(document.getElementById('chart-estado'), {
+    type: 'bar',
+    data: {
+      labels: tecEstadoTop.map(t => t.k),
+      datasets: [
+        { label: 'Operativo', data: tecEstadoTop.map(t => t['Operativo']||0), backgroundColor: '#10b981', borderRadius: 4, stack: 's' },
+        { label: 'Pendiente', data: tecEstadoTop.map(t => t['Pendiente/Observación']||0), backgroundColor: '#f59e0b', borderRadius: 4, stack: 's' },
+        { label: 'No informado', data: tecEstadoTop.map(t => t['No informado']||0), backgroundColor: '#cbd5e1', borderRadius: 4, stack: 's' },
+      ]
+    },
+    options: { plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true } } }
+  });
+
+  // Reinc cliente
+  destroyChart('chart-reinc-cliente');
+  const cliReinc = {};
+  FILTERED.forEach(r => {
+    if (r['Cliente'] && r['Reincidencia_Equipo']) {
+      if (!cliReinc[r['Cliente']]) cliReinc[r['Cliente']] = 0;
+      cliReinc[r['Cliente']] = Math.max(cliReinc[r['Cliente']], r['Reincidencia_Equipo']);
+    }
+  });
+  const cliReincArr = Object.entries(cliReinc).filter(([k,v]) => v >= 2).sort((a,b) => b[1]-a[1]).slice(0,10);
+  CHARTS['chart-reinc-cliente'] = new Chart(document.getElementById('chart-reinc-cliente'), {
+    type: 'bar',
+    data: {
+      labels: cliReincArr.map(c => c[0]),
+      datasets: [{
+        data: cliReincArr.map(c => c[1]),
+        backgroundColor: cliReincArr.map(c => c[1] >= 4 ? '#dc2626' : c[1] >= 3 ? '#f59e0b' : '#fbbf24'),
+        borderRadius: 6,
+      }]
+    },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } } }
+  });
+
+  // Fallas críticas
+  destroyChart('chart-fallas-criticas');
+  const equiposCriticosSet = new Set(FILTERED.filter(r => r['Reincidencia_Equipo'] >= 4).map(r => r['Equipo']));
+  const fallasCriticas = {};
+  FILTERED.filter(r => equiposCriticosSet.has(r['Equipo']) && r['Tipo_Falla_Final']).forEach(r => {
+    fallasCriticas[r['Tipo_Falla_Final']] = (fallasCriticas[r['Tipo_Falla_Final']]||0)+1;
+  });
+  CHARTS['chart-fallas-criticas'] = new Chart(document.getElementById('chart-fallas-criticas'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(fallasCriticas),
+      datasets: [{ data: Object.values(fallasCriticas), backgroundColor: ['#3b82f6', '#06b6d4', '#f59e0b', '#ef4444', '#94a3b8'], borderWidth: 0 }]
+    },
+    options: { cutout: '60%', plugins: { legend: { position: 'bottom' } } }
+  });
+
+  // Duración por técnico
+  destroyChart('chart-duracion');
+  const tecDur = {};
+  FILTERED.filter(r => r['Fuente'] === 'OT Taller' && r['Técnico']).forEach(r => {
+    if (!tecDur[r['Técnico']]) tecDur[r['Técnico']] = { dias: [], horas: [] };
+    if (r['Días_Trabajados'] != null) tecDur[r['Técnico']].dias.push(r['Días_Trabajados']);
+    if (r['Horas_Trabajadas'] != null) tecDur[r['Técnico']].horas.push(r['Horas_Trabajadas']);
+  });
+  const tecDurArr = Object.entries(tecDur).map(([k,v]) => ({
+    k,
+    dias: v.dias.length ? v.dias.reduce((a,b)=>a+b,0)/v.dias.length : 0,
+    horas: v.horas.length ? v.horas.reduce((a,b)=>a+b,0)/v.horas.length : 0,
+  })).filter(t => t.dias > 0);
+  CHARTS['chart-duracion'] = new Chart(document.getElementById('chart-duracion'), {
+    type: 'bar',
+    data: {
+      labels: tecDurArr.map(t => t.k),
+      datasets: [
+        { label: 'Días promedio', data: tecDurArr.map(t => +t.dias.toFixed(1)), backgroundColor: '#3b82f6', borderRadius: 6, yAxisID: 'y' },
+        { label: 'Horas promedio', data: tecDurArr.map(t => +t.horas.toFixed(1)), backgroundColor: '#10b981', borderRadius: 6, yAxisID: 'y1' },
+      ]
+    },
+    options: {
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { position: 'left', title: { display: true, text: 'Días' } }, y1: { position: 'right', title: { display: true, text: 'Horas' }, grid: { drawOnChartArea: false } } }
+    }
+  });
+
+  // Distribución duración
+  destroyChart('chart-dist-duracion');
+  const distDur = { '1 día': 0, '2 días': 0, '3 días': 0, '4 días': 0, '5+ días': 0 };
+  FILTERED.filter(r => r['Fuente'] === 'OT Taller' && r['Días_Trabajados'] != null).forEach(r => {
+    const d = r['Días_Trabajados'];
+    if (d === 1) distDur['1 día']++;
+    else if (d === 2) distDur['2 días']++;
+    else if (d === 3) distDur['3 días']++;
+    else if (d === 4) distDur['4 días']++;
+    else distDur['5+ días']++;
+  });
+  CHARTS['chart-dist-duracion'] = new Chart(document.getElementById('chart-dist-duracion'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(distDur),
+      datasets: [{ data: Object.values(distDur), backgroundColor: ['#10b981', '#10b981', '#3b82f6', '#f59e0b', '#ef4444'], borderRadius: 6 }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+// ============ TABLES ============
+function renderTables() {
+  // Técnicos
+  const tecStats = {};
+  FILTERED.forEach(r => {
+    const t = r['Técnico']; if (!t) return;
+    if (!tecStats[t]) tecStats[t] = { nombre: t, esp: r['Especialidad'], total: 0, prev: 0, corr: 0, diag: 0, op: 0, reinc: [] };
+    tecStats[t].total++;
+    if (r['Tipo_Trabajo_Final'] === 'Mantención/Preventiva') tecStats[t].prev++;
+    else if (r['Tipo_Trabajo_Final'] === 'Correctiva') tecStats[t].corr++;
+    else if (r['Tipo_Trabajo_Final'] === 'Diagnóstico/Revisión') tecStats[t].diag++;
+    if (r['Estado_Final'] === 'Operativo') tecStats[t].op++;
+    if (r['Reincidencia_Equipo'] != null) tecStats[t].reinc.push(r['Reincidencia_Equipo']);
+  });
+  const tecArr = Object.values(tecStats).map(t => ({
+    ...t,
+    pctOp: t.total ? (t.op*100/t.total).toFixed(0)+'%' : '—',
+    reincProm: t.reinc.length ? (t.reinc.reduce((a,b)=>a+b,0)/t.reinc.length).toFixed(2) : '—'
+  })).sort((a,b) => b.total - a.total);
+
+  document.querySelector('#table-tecnicos tbody').innerHTML = tecArr.map(t => `
+    <tr>
+      <td class="font-medium text-slate-900">${escapeHtml(t.nombre)}</td>
+      <td>${escapeHtml(t.esp) || '—'}</td>
+      <td class="text-right font-mono">${t.total}</td>
+      <td class="text-right font-mono text-emerald-600">${t.prev}</td>
+      <td class="text-right font-mono text-amber-600">${t.corr}</td>
+      <td class="text-right font-mono">${t.diag}</td>
+      <td class="text-right"><span class="badge ${parseInt(t.pctOp) >= 40 ? 'badge-green' : parseInt(t.pctOp) >= 25 ? 'badge-amber' : 'badge-red'}">${escapeHtml(t.pctOp)}</span></td>
+      <td class="text-right font-mono">${escapeHtml(t.reincProm)}</td>
+    </tr>
+  `).join('');
+
+  // Reincidencia
+  const eqStats = {};
+  FILTERED.forEach(r => {
+    const eq = r['Equipo']; if (eq == null) return;
+    if (!eqStats[eq]) eqStats[eq] = { equipo: eq, cliente: r['Cliente'], marca: r['Marca'], visitas: 0, reincMax: 0 };
+    eqStats[eq].visitas++;
+    if (r['Reincidencia_Equipo'] != null && r['Reincidencia_Equipo'] > eqStats[eq].reincMax) eqStats[eq].reincMax = r['Reincidencia_Equipo'];
+  });
+  const eqArr = Object.values(eqStats).filter(e => e.reincMax >= 2).sort((a,b) => b.reincMax - a.reincMax).slice(0,10);
+  const maxReinc = Math.max(...eqArr.map(e => e.reincMax), 1);
+  document.querySelector('#table-reincidencia tbody').innerHTML = eqArr.map(e => {
+    const pct = (e.reincMax / maxReinc * 100).toFixed(0);
+    const status = e.reincMax >= 4 ? '<span class="badge badge-red">Crítico</span>' : '<span class="badge badge-amber">Alerta</span>';
+    return `<tr>
+      <td class="font-mono font-semibold">${escapeHtml(e.equipo)}</td>
+      <td>${escapeHtml(e.cliente) || '—'}</td>
+      <td>${escapeHtml(e.marca) || '—'}</td>
+      <td class="text-right font-mono">${e.visitas}</td>
+      <td class="text-right font-mono ${e.reincMax >= 4 ? 'text-rose-600 font-bold' : 'text-amber-600'}">${e.reincMax}</td>
+      <td><div class="repeating-bar"><div style="width:${pct}%"></div></div></td>
+      <td class="text-center">${status}</td>
+    </tr>`;
+  }).join('');
+
+  // Tiempos
+  const tecTiempos = {};
+  FILTERED.filter(r => r['Fuente'] === 'OT Taller' && r['Técnico']).forEach(r => {
+    if (!tecTiempos[r['Técnico']]) tecTiempos[r['Técnico']] = { nombre: r['Técnico'], count: 0, dias: [], horas: [], maxDias: 0 };
+    tecTiempos[r['Técnico']].count++;
+    if (r['Días_Trabajados'] != null) {
+      tecTiempos[r['Técnico']].dias.push(r['Días_Trabajados']);
+      if (r['Días_Trabajados'] > tecTiempos[r['Técnico']].maxDias) tecTiempos[r['Técnico']].maxDias = r['Días_Trabajados'];
+    }
+    if (r['Horas_Trabajadas'] != null) tecTiempos[r['Técnico']].horas.push(r['Horas_Trabajadas']);
+  });
+  const tecTiemposArr = Object.values(tecTiempos).map(t => ({
+    ...t,
+    diasProm: t.dias.length ? (t.dias.reduce((a,b)=>a+b,0)/t.dias.length).toFixed(1) : '—',
+    horasProm: t.horas.length ? (t.horas.reduce((a,b)=>a+b,0)/t.horas.length).toFixed(1) : '—',
+    horasTot: t.horas.reduce((a,b)=>a+b,0).toFixed(1)
+  })).sort((a,b) => b.count - a.count);
+  document.querySelector('#table-tiempos tbody').innerHTML = tecTiemposArr.map(t => `
+    <tr>
+      <td class="font-medium text-slate-900">${escapeHtml(t.nombre)}</td>
+      <td class="text-right font-mono">${t.count}</td>
+      <td class="text-right font-mono">${escapeHtml(t.diasProm)}</td>
+      <td class="text-right font-mono">${escapeHtml(t.horasProm)}</td>
+      <td class="text-right font-mono">${escapeHtml(t.horasTot)}</td>
+      <td class="text-right font-mono ${t.maxDias >= 10 ? 'text-rose-600' : ''}">${t.maxDias} días</td>
+    </tr>
+  `).join('');
+}
+
+// ============ AUTO-REFRESH ============
+// Refresca los datos automáticamente cada 2 minutos (120000 ms).
+// Si usas el Apps Script Proxy, este intervalo es seguro: el proxy lee
+// el Sheet en cada request y entrega datos frescos.
+// Para desactivar, comenta la siguiente línea.
+setInterval(() => { if (RAW_DATA.length > 0) loadData(true); }, 120000);
+
+// ============ WINDOW RESIZE ============
+// Reajusta los charts cuando se cambia el tamaño de la ventana (rotación móvil, resize desktop)
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    Object.values(CHARTS).forEach(c => c && c.resize && c.resize());
+  }, 150);
+});
+
+// ============ INIT ============
+document.addEventListener('DOMContentLoaded', () => loadData());
+
+// ============ LOGO LOADER ============
+// El logo de LICMAN se carga desde logo.svg automáticamente
+// Para reemplazarlo, sobreescribe el archivo logo.svg en la misma carpeta del dashboard
+</script>
+
+</body>
+</html>
