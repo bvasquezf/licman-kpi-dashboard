@@ -503,55 +503,114 @@ function resolveSourceUrl() {
 }
 
 // ============ LOAD DATA ============
-async function loadData(force = false) {
-  const refreshIcon = document.getElementById('refresh-icon');
-  refreshIcon.style.animation = 'spin 0.8s linear infinite';
+// Estado de cargas concurrentes para evitar race conditions
+let isLoading = false;
+let currentLoadController = null;
+let currentLoadGen = 0;
 
-  const url = resolveSourceUrl();
-  if (url && (force || RAW_DATA.length === 0)) {
-    let loaded = false;
-    // Primer intento: cache-busting reforzado con retry exponencial
-    try {
-      const separator = url.includes('?') ? '&' : '?';
-      const freshUrl = url + separator + '_t=' + Date.now() + '_r=' + Math.random().toString(36).slice(2);
-      const resp = await fetchWithRetry(freshUrl, { cache: 'no-store' }, 3);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const csvText = await resp.text();
-      const parsed = parseCsvWithMetadata(csvText);
-      RAW_DATA = parsed.data;
-      updateStatusFromLoad_(parsed, 'live');
-      loaded = true;
-    } catch (err) {
-      console.warn('Primer intento falló:', err);
-      // Segundo intento: cache-busting simple tras 2s
-      document.getElementById('data-status').textContent = '⚠ Reintentando...';
+async function loadData(force = false) {
+  // Guard: si ya hay una carga en curso y no es forzada, ignoramos
+  // (force=true siempre inicia una nueva que cancela la anterior)
+  if (isLoading && !force) {
+    return;
+  }
+
+  // Cancelar carga anterior si existe
+  if (currentLoadController) {
+    try { currentLoadController.abort(); } catch (e) {}
+  }
+
+  const controller = new AbortController();
+  currentLoadController = controller;
+  const myGen = ++currentLoadGen;
+  isLoading = true;
+
+  const refreshIcon = document.getElementById('refresh-icon');
+  const refreshBtn = document.getElementById('refresh-btn');
+  const refreshBtnText = refreshBtn ? refreshBtn.querySelector('span') : null;
+  const originalBtnText = refreshBtnText ? refreshBtnText.textContent : null;
+
+  if (refreshIcon) refreshIcon.style.animation = 'spin 0.8s linear infinite';
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    if (refreshBtnText) refreshBtnText.textContent = 'Cargando...';
+  }
+
+  const cleanup = () => {
+    if (myGen === currentLoadGen) {
+      if (refreshIcon) refreshIcon.style.animation = '';
+      if (refreshBtn) {
+        refreshBtn.disabled = false;
+        if (refreshBtnText && originalBtnText != null) refreshBtnText.textContent = originalBtnText;
+      }
+      isLoading = false;
+      currentLoadController = null;
+    }
+  };
+
+  try {
+    const url = resolveSourceUrl();
+    if (url && (force || RAW_DATA.length === 0)) {
+      let loaded = false;
+      // Primer intento: cache-busting reforzado con retry exponencial
       try {
-        await new Promise(r => setTimeout(r, 2000));
         const separator = url.includes('?') ? '&' : '?';
-        const freshUrl = url + separator + '_t=' + Date.now();
-        const resp = await fetch(freshUrl, { cache: 'no-store' });
+        const freshUrl = url + separator + '_t=' + Date.now() + '_r=' + Math.random().toString(36).slice(2);
+        const resp = await fetchWithRetry(freshUrl, { cache: 'no-store', signal: controller.signal }, 3);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const csvText = await resp.text();
         const parsed = parseCsvWithMetadata(csvText);
+
+        if (myGen !== currentLoadGen) return;
+
         RAW_DATA = parsed.data;
         updateStatusFromLoad_(parsed, 'live');
         loaded = true;
-      } catch (err2) {
-        console.error('Segundo intento falló:', err2);
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.warn('Primer intento falló:', err);
+        // Segundo intento: cache-busting simple tras 2s
+        document.getElementById('data-status').textContent = '⚠ Reintentando...';
+        try {
+          await new Promise(r => setTimeout(r, 2000));
+          if (myGen !== currentLoadGen) return;
+
+          const separator = url.includes('?') ? '&' : '?';
+          const freshUrl = url + separator + '_t=' + Date.now();
+          const resp = await fetch(freshUrl, { cache: 'no-store', signal: controller.signal });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          const csvText = await resp.text();
+          const parsed = parseCsvWithMetadata(csvText);
+
+          if (myGen !== currentLoadGen) return;
+
+          RAW_DATA = parsed.data;
+          updateStatusFromLoad_(parsed, 'live');
+          loaded = true;
+        } catch (err2) {
+          if (err2.name === 'AbortError') return;
+          console.error('Segundo intento falló:', err2);
+        }
       }
-    }
-    if (!loaded) {
-      document.getElementById('data-status').textContent = '⚠ Error al cargar fuente, usando datos locales';
+      if (!loaded) {
+        if (myGen !== currentLoadGen) return;
+        document.getElementById('data-status').textContent = '⚠ Error al cargar fuente, usando datos locales';
+        await loadFallback();
+      }
+    } else if (RAW_DATA.length === 0) {
       await loadFallback();
     }
-  } else if (RAW_DATA.length === 0) {
-    await loadFallback();
-  }
 
-  refreshIcon.style.animation = '';
-  applyFilters();
-  populateFilterOptions();
-  renderAll();
+    if (myGen !== currentLoadGen) return;
+
+    applyFilters();
+    populateFilterOptions();
+    renderAll();
+  } catch (err) {
+    if (err.name !== 'AbortError') console.error('Error en loadData:', err);
+  } finally {
+    cleanup();
+  }
 }
 
 // Helper: actualiza el badge de estado con datos del servidor si están disponibles
@@ -574,6 +633,7 @@ function updateStatusFromLoad_(parsed, source) {
 }
 
 // Helper: fetch con retry exponencial (solo para errores de red / 5xx)
+// Si la señal se aborta (AbortController), termina inmediatamente sin reintentar.
 async function fetchWithRetry(url, options, maxRetries) {
   let lastErr;
   for (let i = 0; i < maxRetries; i++) {
@@ -584,6 +644,8 @@ async function fetchWithRetry(url, options, maxRetries) {
       if (resp.status >= 400 && resp.status < 500) return resp;
       lastErr = new Error('HTTP ' + resp.status);
     } catch (err) {
+      // Si fue abortado, propagar inmediatamente sin retry
+      if (err.name === 'AbortError') throw err;
       lastErr = err;
     }
     if (i < maxRetries - 1) {
@@ -1126,8 +1188,9 @@ function renderTables() {
 // Refresca los datos automáticamente cada 2 minutos (120000 ms).
 // Si usas el Apps Script Proxy, este intervalo es seguro: el proxy lee
 // el Sheet en cada request y entrega datos frescos.
+// El guard !isLoading evita disparar una carga si ya hay una en curso.
 // Para desactivar, comenta la siguiente línea.
-setInterval(() => { if (RAW_DATA.length > 0) loadData(true); }, 120000);
+setInterval(() => { if (RAW_DATA.length > 0 && !isLoading) loadData(true); }, 120000);
 
 // ============ WINDOW RESIZE ============
 // Reajusta los charts cuando se cambia el tamaño de la ventana (rotación móvil, resize desktop)
