@@ -596,6 +596,30 @@ async function fetchWithRetry(url, options, maxRetries) {
 
 // Helper: parsea CSV y extrae metadata de Apps Script si está presente
 // La metadata viene como última línea tipo: # {"serverTimestamp":"...","rowCount":N}
+// Además normaliza columnas numéricas: convierte strings tipo "8,5" o "" en números o null.
+// Esto evita errores tipo "0 + '8' = '08'" que rompen los .reduce() posteriores.
+const NUMERIC_COLS = ['Reincidencia_Equipo', 'Días_Trabajados', 'Horas_Trabajadas', 'Horómetro'];
+
+function toNumberOrNull(val) {
+  if (val === '' || val === null || val === undefined) return null;
+  if (typeof val === 'number') return isFinite(val) ? val : null;
+  // Soporta coma decimal chilena: "8,5" → 8.5
+  const n = Number(String(val).trim().replace(',', '.'));
+  return isNaN(n) ? null : n;
+}
+
+function normalizeRow(row) {
+  const out = {};
+  for (const key of Object.keys(row)) {
+    if (NUMERIC_COLS.indexOf(key) !== -1) {
+      out[key] = toNumberOrNull(row[key]);
+    } else {
+      out[key] = row[key] == null ? '' : row[key];
+    }
+  }
+  return out;
+}
+
 function parseCsvWithMetadata(csvText) {
   const lines = csvText.split(/\r?\n/);
   let metadata = null;
@@ -618,7 +642,16 @@ function parseCsvWithMetadata(csvText) {
     dynamicTyping: true,
     skipEmptyLines: true,
   });
-  return { data: result.data, metadata };
+  return {
+    data: result.data.map(normalizeRow),
+    metadata
+  };
+}
+
+// Helper: suma defensiva que ignora no-numéricos (null, undefined, "").
+// Útil para evitar errores cuando una columna numérica tiene valores mixtos.
+function safeSum(arr) {
+  return arr.reduce((acc, v) => acc + (Number(v) || 0), 0);
 }
 
 // Helper: escape HTML para prevenir XSS al renderizar celdas del Sheet en el DOM
@@ -648,27 +681,41 @@ async function loadFallback() {
 
 // ============ FILTERS ============
 function populateFilterOptions() {
-  const tecnicos = [...new Set(RAW_DATA.map(r => r['Técnico']).filter(Boolean))].sort();
-  const clientes = [...new Set(RAW_DATA.map(r => r['Cliente']).filter(Boolean))].sort();
-  const periodos = [...new Set(RAW_DATA.map(r => r['Periodo']).filter(Boolean))].sort();
+  try {
+    const tecnicos = [...new Set(RAW_DATA.map(r => r['Técnico']).filter(Boolean))].sort();
+    const clientes = [...new Set(RAW_DATA.map(r => r['Cliente']).filter(Boolean))].sort();
+    const periodos = [...new Set(RAW_DATA.map(r => r['Periodo']).filter(Boolean))].sort();
 
-  const fillSelect = (id, options, allLabel) => {
-    const sel = document.getElementById(id);
-    const current = sel.value;
-    sel.innerHTML = `<option value="">${allLabel}</option>` + options.map(o => `<option value="${o}">${o}</option>`).join('');
-    sel.value = current;
-  };
-  fillSelect('filter-tecnico', tecnicos, 'Todos los técnicos');
-  fillSelect('filter-cliente', clientes, 'Todos los clientes');
-  fillSelect('filter-periodo', periodos, 'Todos los períodos');
+    const fillSelect = (id, options, allLabel) => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const current = sel.value;
+      const optsHtml = options.map(o =>
+        `<option value="${escapeHtml(String(o))}">${escapeHtml(String(o))}</option>`
+      ).join('');
+      sel.innerHTML = `<option value="">${escapeHtml(allLabel)}</option>` + optsHtml;
+      // Restaurar selección solo si el valor aún existe en las opciones
+      if (current && (current === '' || options.indexOf(current) !== -1)) {
+        sel.value = current;
+      }
+    };
+    fillSelect('filter-tecnico', tecnicos, 'Todos los técnicos');
+    fillSelect('filter-cliente', clientes, 'Todos los clientes');
+    fillSelect('filter-periodo', periodos, 'Todos los períodos');
 
-  // Re-attach listeners (cloning to remove old)
-  ['filter-tecnico', 'filter-cliente', 'filter-fuente', 'filter-periodo'].forEach(id => {
-    const el = document.getElementById(id);
-    const newEl = el.cloneNode(true);
-    el.parentNode.replaceChild(newEl, el);
-    newEl.addEventListener('change', applyFilters);
-  });
+    // Adjuntar listener solo una vez (sin clonar el elemento, lo que preserva
+    // el focus y el estado del DOM). Usamos dataset para marcaje.
+    ['filter-tecnico', 'filter-cliente', 'filter-fuente', 'filter-periodo'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (!el.dataset.listenerAttached) {
+        el.addEventListener('change', applyFilters);
+        el.dataset.listenerAttached = '1';
+      }
+    });
+  } catch (err) {
+    console.error('Error poblando filtros:', err);
+  }
 }
 
 function applyFilters() {
@@ -712,7 +759,7 @@ function renderKPIs() {
   const otsTaller = FILTERED.filter(r => r['Fuente'] === 'OT Taller').length;
   const informesTerreno = FILTERED.filter(r => r['Fuente'] === 'Informe Terreno').length;
   const reincidencias = FILTERED.map(r => r['Reincidencia_Equipo']).filter(v => v != null && !isNaN(v));
-  const reincPromedio = reincidencias.length ? (reincidencias.reduce((a,b)=>a+b,0)/reincidencias.length) : 0;
+  const reincPromedio = reincidencias.length ? (safeSum(reincidencias)/reincidencias.length) : 0;
   const equiposCriticos = new Set(FILTERED.filter(r => r['Reincidencia_Equipo'] >= 4).map(r => r['Equipo'])).size;
 
   document.getElementById('kpi-total').textContent = total;
@@ -760,8 +807,8 @@ function renderKPIs() {
   // Tiempos
   const otsConHoras = FILTERED.filter(r => r['Fuente'] === 'OT Taller' && r['Horas_Trabajadas'] != null);
   const otsConDias = FILTERED.filter(r => r['Fuente'] === 'OT Taller' && r['Días_Trabajados'] != null);
-  const durProm = otsConDias.length ? otsConDias.reduce((a,b)=>a+b['Días_Trabajados'],0)/otsConDias.length : 0;
-  const horProm = otsConHoras.length ? otsConHoras.reduce((a,b)=>a+b['Horas_Trabajadas'],0)/otsConHoras.length : 0;
+  const durProm = otsConDias.length ? safeSum(otsConDias.map(r => r['Días_Trabajados']))/otsConDias.length : 0;
+  const horProm = otsConHoras.length ? safeSum(otsConHoras.map(r => r['Horas_Trabajadas']))/otsConHoras.length : 0;
   const otMasLarga = otsConDias.length ? Math.max(...otsConDias.map(r => r['Días_Trabajados'])) : 0;
   const otMasLargaHoras = otsConDias.find(r => r['Días_Trabajados'] === otMasLarga)?.['Horas_Trabajadas'] || 0;
 
@@ -863,7 +910,7 @@ function renderCharts() {
       if (tecTipos[t][tipo] !== undefined) tecTipos[t][tipo]++;
     }
   });
-  const tecTop5 = Object.entries(tecTipos).map(([k,v]) => ({k, total: Object.values(v).reduce((a,b)=>a+b,0), ...v})).sort((a,b) => b.total - a.total).slice(0,5);
+  const tecTop5 = Object.entries(tecTipos).map(([k,v]) => ({k, total: safeSum(Object.values(v)), ...v})).sort((a,b) => b.total - a.total).slice(0,5);
   CHARTS['chart-mix'] = new Chart(document.getElementById('chart-mix'), {
     type: 'bar',
     data: {
@@ -887,7 +934,7 @@ function renderCharts() {
       if (tecEstado[t][est] !== undefined) tecEstado[t][est]++;
     }
   });
-  const tecEstadoTop = Object.entries(tecEstado).map(([k,v]) => ({k, total: Object.values(v).reduce((a,b)=>a+b,0), ...v})).sort((a,b) => b.total - a.total).slice(0,5);
+  const tecEstadoTop = Object.entries(tecEstado).map(([k,v]) => ({k, total: safeSum(Object.values(v)), ...v})).sort((a,b) => b.total - a.total).slice(0,5);
   CHARTS['chart-estado'] = new Chart(document.getElementById('chart-estado'), {
     type: 'bar',
     data: {
@@ -950,8 +997,8 @@ function renderCharts() {
   });
   const tecDurArr = Object.entries(tecDur).map(([k,v]) => ({
     k,
-    dias: v.dias.length ? v.dias.reduce((a,b)=>a+b,0)/v.dias.length : 0,
-    horas: v.horas.length ? v.horas.reduce((a,b)=>a+b,0)/v.horas.length : 0,
+    dias: v.dias.length ? safeSum(v.dias)/v.dias.length : 0,
+    horas: v.horas.length ? safeSum(v.horas)/v.horas.length : 0,
   })).filter(t => t.dias > 0);
   CHARTS['chart-duracion'] = new Chart(document.getElementById('chart-duracion'), {
     type: 'bar',
@@ -1006,7 +1053,7 @@ function renderTables() {
   const tecArr = Object.values(tecStats).map(t => ({
     ...t,
     pctOp: t.total ? (t.op*100/t.total).toFixed(0)+'%' : '—',
-    reincProm: t.reinc.length ? (t.reinc.reduce((a,b)=>a+b,0)/t.reinc.length).toFixed(2) : '—'
+    reincProm: t.reinc.length ? (safeSum(t.reinc)/t.reinc.length).toFixed(2) : '—'
   })).sort((a,b) => b.total - a.total);
 
   document.querySelector('#table-tecnicos tbody').innerHTML = tecArr.map(t => `
@@ -1059,9 +1106,9 @@ function renderTables() {
   });
   const tecTiemposArr = Object.values(tecTiempos).map(t => ({
     ...t,
-    diasProm: t.dias.length ? (t.dias.reduce((a,b)=>a+b,0)/t.dias.length).toFixed(1) : '—',
-    horasProm: t.horas.length ? (t.horas.reduce((a,b)=>a+b,0)/t.horas.length).toFixed(1) : '—',
-    horasTot: t.horas.reduce((a,b)=>a+b,0).toFixed(1)
+    diasProm: t.dias.length ? (safeSum(t.dias)/t.dias.length).toFixed(1) : '—',
+    horasProm: t.horas.length ? (safeSum(t.horas)/t.horas.length).toFixed(1) : '—',
+    horasTot: t.horas.length ? safeSum(t.horas).toFixed(1) : '—'
   })).sort((a,b) => b.count - a.count);
   document.querySelector('#table-tiempos tbody').innerHTML = tecTiemposArr.map(t => `
     <tr>
