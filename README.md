@@ -50,13 +50,13 @@ Ver [README_PROXY.md](README_PROXY.md) para instrucciones detalladas del proxy.
 
 ```
 licman-kpi-dashboard/
-├── index.html                          ← Dashboard principal
-├── netlify.toml                        ← Configuración de Netlify
+├── index.html                          ← Dashboard principal (Netlify lo sirve en /)
+├── netlify.toml                        ← Configuración de Netlify + headers de seguridad
 ├── logo.svg                            ← Logo de LICMAN
 ├── proxy-google-sheet-apps-script.js   ← Código del Apps Script Proxy (pegar en script.google.com)
 ├── README.md                           ← Este archivo
 ├── README_PROXY.md                     ← Guía de despliegue del proxy
-├── QUIICKSTART.md                      ← Guía de fórmulas de auto-clasificación
+├── QUICKSTART.md                       ← Guía de fórmulas de auto-clasificación
 ├── FORMULAS_AUTO_CLASIFICACION.md      ← Detalle de las fórmulas
 ├── CAMPOS_REFERENCIA.html              ← Referencia de columnas del Sheet
 └── .gitignore
@@ -80,12 +80,26 @@ Ver el progreso en: `https://app.netlify.com/sites/kpi-licman/deploys`
 
 ## 🛠 Cambios recientes
 
+- ✅ **Seguridad** (Lote 1): XSS fix en alert-box, validación de URL en saveSource, detección de respuesta HTML del proxy, headers CSP + HSTS en Netlify
+- ✅ **Robustez de datos** (Lote 1): `toNumberOrNull` soporta formato chileno con miles (`1.234,56` → 1234.56), `trim()` en strings para evitar duplicados en filtros
 - ✅ **Auto-clasificación** en Google Sheets con fórmulas (`Tipo_Trabajo_Auto`, etc.)
 - ✅ **Apps Script Proxy** para evitar caché del CDN de Google Sheets
 - ✅ **Responsive mobile** (charts se ajustan al contenedor, padding mobile-first)
 - ✅ **Retry con backoff exponencial** al cargar datos
 - ✅ **Escape HTML** en tablas (defensa XSS)
 - ✅ **Auto-refresh cada 2 min** (antes 5 min)
+
+---
+
+## 🔒 Seguridad
+
+El dashboard implementa varias capas de seguridad:
+
+- **CSP (Content-Security-Policy)**: configurado en `netlify.toml`. Restringe scripts, estilos y conexiones a orígenes conocidos.
+- **HSTS**: fuerza HTTPS por 1 año.
+- **XSS prevention**: `escapeHtml()` en todas las celdas de tablas y filtros. `alert-text` usa DOM seguro (textContent + createElement).
+- **URL validation**: `saveSource()` rechaza URLs no-HTTP(S) (`javascript:`, `data:`, etc.) antes de guardarlas en localStorage.
+- **Detección de HTML**: si el proxy responde HTML (login de Google, proxy caído), el dashboard fuerza fallback en vez de fallar silencioso.
 
 ---
 

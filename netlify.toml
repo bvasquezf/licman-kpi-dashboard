@@ -9,20 +9,44 @@
 # No build step required — static HTML/CSS/JS site
 # Netlify serves index.html at the root URL automatically
 
+# =============================================================
+# Security headers — applied to ALL responses
+# =============================================================
 [[headers]]
   for = "/*"
   [headers.values]
+    # Anti-clickjacking: solo permitir embed en el mismo origen
     X-Frame-Options = "SAMEORIGIN"
+    # Prevenir MIME-sniffing
     X-Content-Type-Options = "nosniff"
+    # Privacidad de referrer
     Referrer-Policy = "strict-origin-when-cross-origin"
+    # Deshabilitar APIs sensibles no usadas
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    # Forzar HTTPS por 1 año (incluir subdominios)
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    # Content Security Policy
+    # - script-src incluye 'unsafe-inline' y 'unsafe-eval' porque:
+    #     1. Tailwind CDN (cdn.tailwindcss.com) genera estilos en runtime
+    #     2. El HTML tiene atributos inline (onclick="...") que requieren unsafe-inline
+    #   Si en el futuro se compila Tailwind localmente, se pueden remover.
+    # - connect-src: solo permitir fetch al proxy de Google y mismo origen
+    # - frame-ancestors 'self' reemplaza X-Frame-Options en navegadores modernos
+    # - base-uri 'self' previene inyecciones de <base>
+    # - form-action 'self' previene formularios apuntando a otros dominios
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://script.google.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
 
+# =============================================================
+# Cache control
+# =============================================================
+
+# HTML: no cachear (siempre revalidar para ver deploys nuevos)
 [[headers]]
   for = "/index.html"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
-# Cache agresivo para assets estáticos que cambian poco
+# Assets estáticos: cache agresivo por 1 día
 [[headers]]
   for = "/*.svg"
   [headers.values]
@@ -33,8 +57,8 @@
   [headers.values]
     Cache-Control = "public, max-age=86400"
 
-# Permitir cross-origin solo para fonts (Tailwind y Google Fonts cargan vía CDN)
+# Documentación: cache moderado
 [[headers]]
-  for = "/index.html"
+  for = "/*.md"
   [headers.values]
-    Access-Control-Allow-Origin = "*"
+    Cache-Control = "public, max-age=3600"
