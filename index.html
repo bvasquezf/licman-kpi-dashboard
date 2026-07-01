@@ -23,29 +23,40 @@
   .badge-green { background: #ecfdf5; color: #047857; }
   .badge-blue { background: #eff6ff; color: #1d4ed8; }
   .badge-gray { background: #f1f5f9; color: #475569; }
-  .slicer { background: white; border: 1px solid #e2e8f0; padding: 6px 12px; border-radius: 8px; font-size: 13px; color: #475569; cursor: pointer; }
+  /* slicer: ahora con min-height 44px para cumplir WCAG 2.5.5 / Apple HIG */
+  .slicer { background: white; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 8px; font-size: 14px; color: #475569; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; }
   .slicer:hover { border-color: #2563eb; }
   .repeating-bar { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
   .repeating-bar > div { height: 100%; background: linear-gradient(90deg, #f43f5e, #fb7185); border-radius: 4px; }
   table { border-collapse: separate; border-spacing: 0; width: 100%; }
-  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: left; background: #f8fafc; }
-  td { font-size: 13px; padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
+  /* Contraste WCAG AA: subimos color de #64748b a #475569 */
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; font-weight: 600; padding: 12px 14px; border-bottom: 1px solid #e2e8f0; text-align: left; background: #f8fafc; }
+  td { font-size: 14px; padding: 12px 14px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
   tr:hover td { background: #f8fafc; }
-  .topbar { background: white; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 30; }
+  /* Safe-area-inset para iPhone con notch + Dynamic Island */
+  .topbar { background: white; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 30; padding-top: env(safe-area-inset-top); }
   .filter-bar { background: white; border-bottom: 1px solid #e2e8f0; padding: 12px 0; position: sticky; top: 64px; z-index: 25; }
-  .filter-bar select { background: white; border: 1px solid #cbd5e1; padding: 6px 28px 6px 12px; border-radius: 8px; font-size: 13px; color: #1e293b; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3e%3cpath d='M6 9l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 16px; }
+  .filter-bar select { background: white; border: 1px solid #cbd5e1; padding: 10px 28px 10px 12px; border-radius: 8px; font-size: 14px; color: #1e293b; cursor: pointer; appearance: none; min-height: 44px; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3e%3cpath d='M6 9l6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 8px center; background-size: 16px; }
   .filter-bar select:hover { border-color: #2563eb; }
   .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .alert-box { background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%); border: 1px solid #fecdd3; border-radius: 14px; padding: 20px; }
   .source-config { background: #fefce8; border: 1px dashed #facc15; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
   .source-config code { background: #fde68a; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-  .source-config button { background: #ca8a04; color: white; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
+  .source-config button { background: #ca8a04; color: white; padding: 10px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; min-height: 44px; }
   .source-config button:hover { background: #a16207; }
-  .source-config input { background: white; border: 1px solid #fde047; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-family: 'JetBrains Mono', monospace; width: 320px; }
-  .last-update { font-size: 11px; color: #94a3b8; }
+  .source-config input { background: white; border: 1px solid #fde047; padding: 10px 12px; border-radius: 6px; font-size: 14px; font-family: 'JetBrains Mono', monospace; width: 320px; min-height: 44px; }
+  /* Contraste WCAG AA: subimos color de #94a3b8 a #64748b */
+  .last-update { font-size: 12px; color: #64748b; }
+
   /* Prevenir zoom de doble tap en iOS al tocar botones */
   button, .tab-btn, .slicer, select { touch-action: manipulation; }
+
+  /* === FOCUS VISIBLE para navegación con teclado (WCAG 2.4.7) === */
+  *:focus { outline: none; }
+  *:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 4px; }
+  .tab-btn:focus-visible { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.4); }
+  button:focus-visible, .slicer:focus-visible { border-color: #2563eb; }
 
   /* === RESPONSIVE: charts === */
   .chart-wrap { position: relative; width: 100%; height: 260px; }
@@ -61,8 +72,8 @@
     .max-w-\[1500px\] { padding-left: 14px !important; padding-right: 14px !important; }
     .kpi-card, .panel, .alert-box { padding: 14px !important; }
     .kpi-card .text-3xl { font-size: 1.5rem !important; line-height: 1.85rem !important; }
-    .tab-btn { padding: 0.55rem 0.85rem !important; font-size: 0.78rem !important; white-space: nowrap; }
-    .filter-bar select, .slicer { font-size: 12px !important; padding: 5px 24px 5px 10px !important; }
+    /* Tab buttons: min-height 44px + texto mínimo 14px (subido de 0.78rem ≈ 12.5px) */
+    .tab-btn { padding: 12px 14px !important; font-size: 14px !important; white-space: nowrap; min-height: 44px; }
     .chart-wrap { height: 230px; }
     .alert-box .w-12 { width: 2.5rem !important; height: 2.5rem !important; }
     .alert-box svg { width: 20px !important; height: 20px !important; }
@@ -70,15 +81,21 @@
     .filter-bar { position: relative !important; top: 0 !important; }
   }
   @media (max-width: 480px) {
-    body { font-size: 13px; }
-    .topbar h1 { font-size: 0.95rem !important; }
-    .topbar .text-xs { font-size: 10px !important; }
-    .kpi-card .text-3xl { font-size: 1.25rem !important; line-height: 1.65rem !important; }
-    .kpi-card .text-xs, .panel .text-xs { font-size: 10px !important; }
-    th { font-size: 10px !important; padding: 8px !important; }
-    td { font-size: 12px !important; padding: 8px !important; }
+    /* Body mínimo 14px para legibilidad */
+    body { font-size: 14px; }
+    .topbar h1 { font-size: 1rem !important; }
+    /* Subido de 10px a 12px (mínimo legible para sub-labels) */
+    .topbar .text-xs { font-size: 12px !important; }
+    .kpi-card .text-3xl { font-size: 1.5rem !important; line-height: 1.85rem !important; }
+    .kpi-card .text-xs, .panel .text-xs { font-size: 12px !important; }
+    /* Headers de tabla: subido de 10px a 12px */
+    th { font-size: 12px !important; padding: 10px !important; }
+    /* Celdas: subido de 12px a 14px (legibilidad) */
+    td { font-size: 14px !important; padding: 10px !important; }
     .chart-wrap { height: 200px; }
     .hide-on-tiny { display: none !important; }
+    /* source-config input ocupa todo el ancho en móvil */
+    .source-config input { width: 100% !important; max-width: 320px; }
   }
 </style>
 </head>
@@ -97,23 +114,23 @@
         <div class="flex items-center gap-2 mt-0.5 flex-wrap">
           <p class="text-xs text-slate-500">OTs + Informes Terreno · </p>
           <p class="text-xs font-medium text-blue-700 flex items-center gap-1">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span id="last-update">Cargando...</span>
+            <svg aria-hidden="true" focusable="false" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span id="last-update" aria-live="polite">Cargando...</span>
           </p>
         </div>
       </div>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <span class="slicer flex items-center gap-2 text-xs">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span class="slicer flex items-center gap-2 text-xs" role="status" aria-label="Auto-refresh activado cada 2 minutos">
+        <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         <span class="hidden sm:inline">Auto-refresh </span>2 min
       </span>
-      <button id="refresh-btn" onclick="loadData(true)" class="slicer flex items-center gap-2">
-        <svg id="refresh-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6"/><path d="M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3"/><path d="M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+      <button id="refresh-btn" onclick="loadData(true)" aria-label="Actualizar datos manualmente" class="slicer flex items-center gap-2">
+        <svg id="refresh-icon" aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6"/><path d="M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3"/><path d="M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
         <span>Actualizar</span>
       </button>
-      <button onclick="openSourceConfig()" class="slicer flex items-center gap-2">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <button onclick="openSourceConfig()" aria-label="Configurar fuente de datos" class="slicer flex items-center gap-2">
+        <svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span class="hidden sm:inline">Configurar fuente</span>
         <span class="sm:hidden">Config</span>
       </button>
@@ -123,25 +140,25 @@
   <!-- Source config (hidden by default) -->
   <div id="source-config" class="source-config" style="display:none;">
     <div class="max-w-[1500px] mx-auto px-4 md:px-8 flex items-center gap-3 flex-wrap">
-      <strong class="text-xs md:text-sm">URL de la fuente (Sheet CSV directo o Apps Script Proxy):</strong>
-      <input id="sheet-url" type="text" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0  ó  https://script.google.com/macros/s/.../exec">
+      <label for="sheet-url" class="text-xs md:text-sm font-semibold">URL de la fuente (Sheet CSV directo o Apps Script Proxy):</label>
+      <input id="sheet-url" type="url" inputmode="url" aria-label="URL de la fuente de datos" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0  ó  https://script.google.com/macros/s/.../exec">
       <button onclick="saveSource()">Guardar y actualizar</button>
       <button onclick="closeSourceConfig()" style="background:#94a3b8;">Cancelar</button>
       <a href="README_PROXY.md" target="_blank" rel="noopener noreferrer" style="margin-left:auto; color:#854d0e; text-decoration:underline;">¿Cómo configurar el proxy? →</a>
     </div>
     <div class="max-w-[1500px] mx-auto px-4 md:px-8">
-      <div id="source-config-error" role="alert" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; background:#fee2e2; color:#991b1b; border-radius:6px; font-size:0.85rem;"></div>
+      <div id="source-config-error" role="alert" aria-live="assertive" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; background:#fee2e2; color:#991b1b; border-radius:6px; font-size:0.85rem;"></div>
     </div>
   </div>
 
-  <!-- TABS -->
+  <!-- TABS (role=tablist para WAI-ARIA pattern) -->
   <div class="max-w-[1500px] mx-auto px-4 md:px-8 mt-2">
     <div class="tabs-scroll">
-      <div class="flex gap-1 min-w-max">
-        <button class="tab-btn active px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium" data-tab="resumen">📊 Resumen Ejecutivo</button>
-        <button class="tab-btn px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-100" data-tab="tecnicos">👷 Desempeño por Técnico</button>
-        <button class="tab-btn px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-100" data-tab="reincidencia">🚨 Reincidencia y Calidad</button>
-        <button class="tab-btn px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-100" data-tab="tiempos">⏱️ Análisis de Tiempos</button>
+      <div role="tablist" aria-label="Vistas del dashboard" class="flex gap-1 min-w-max">
+        <button role="tab" aria-selected="true" aria-controls="tab-resumen" id="tab-btn-resumen" tabindex="0" class="tab-btn active px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium" data-tab="resumen">📊 Resumen Ejecutivo</button>
+        <button role="tab" aria-selected="false" aria-controls="tab-tecnicos" id="tab-btn-tecnicos" tabindex="-1" class="tab-btn px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-100" data-tab="tecnicos">👷 Desempeño por Técnico</button>
+        <button role="tab" aria-selected="false" aria-controls="tab-reincidencia" id="tab-btn-reincidencia" tabindex="-1" class="tab-btn px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-100" data-tab="reincidencia">🚨 Reincidencia y Calidad</button>
+        <button role="tab" aria-selected="false" aria-controls="tab-tiempos" id="tab-btn-tiempos" tabindex="-1" class="tab-btn px-3 md:px-5 py-2 md:py-2.5 rounded-t-lg text-xs md:text-sm font-medium text-slate-600 hover:bg-slate-100" data-tab="tiempos">⏱️ Análisis de Tiempos</button>
       </div>
     </div>
   </div>
@@ -151,13 +168,13 @@
 <div class="filter-bar">
   <div class="max-w-[1500px] mx-auto px-4 md:px-8 flex items-center gap-2 md:gap-3 flex-wrap">
     <span class="text-xs font-medium text-slate-500 uppercase tracking-wide mr-2 hidden sm:inline">Filtros:</span>
-    <select id="filter-tecnico" class="text-xs md:text-sm"><option value="">Todos los técnicos</option></select>
-    <select id="filter-cliente" class="text-xs md:text-sm"><option value="">Todos los clientes</option></select>
-    <select id="filter-fuente" class="text-xs md:text-sm"><option value="">Todas las fuentes</option><option value="OT Taller">OT Taller</option><option value="Informe Terreno">Informe Terreno</option></select>
-    <select id="filter-periodo" class="text-xs md:text-sm"><option value="">Todos los períodos</option></select>
-    <button onclick="resetFilters()" class="text-xs text-blue-600 hover:underline ml-2">Limpiar filtros</button>
-    <div class="ml-auto flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
-      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+    <select id="filter-tecnico" aria-label="Filtrar por técnico" class="text-xs md:text-sm"><option value="">Todos los técnicos</option></select>
+    <select id="filter-cliente" aria-label="Filtrar por cliente" class="text-xs md:text-sm"><option value="">Todos los clientes</option></select>
+    <select id="filter-fuente" aria-label="Filtrar por fuente" class="text-xs md:text-sm"><option value="">Todas las fuentes</option><option value="OT Taller">OT Taller</option><option value="Informe Terreno">Informe Terreno</option></select>
+    <select id="filter-periodo" aria-label="Filtrar por período" class="text-xs md:text-sm"><option value="">Todos los períodos</option></select>
+    <button onclick="resetFilters()" aria-label="Limpiar todos los filtros" class="text-xs text-blue-600 hover:underline ml-2" style="min-height:44px; padding:10px 14px;">Limpiar filtros</button>
+    <div class="ml-auto flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg" role="status" aria-live="polite">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true"></span>
       <span id="data-status" class="text-xs font-medium text-emerald-800">Conectando...</span>
     </div>
   </div>
@@ -166,7 +183,7 @@
 <div class="max-w-[1500px] mx-auto px-4 md:px-8 py-4 md:py-6">
 
 <!-- ============= TAB 1: RESUMEN EJECUTIVO ============= -->
-<div class="tab-content active" id="tab-resumen">
+<div class="tab-content active" id="tab-resumen" role="tabpanel" aria-labelledby="tab-btn-resumen" tabindex="0">
 
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
     <div class="kpi-card p-5">
@@ -262,7 +279,7 @@
 </div>
 
 <!-- ============= TAB 2: DESEMPEÑO POR TÉCNICO ============= -->
-<div class="tab-content" id="tab-tecnicos">
+<div class="tab-content" id="tab-tecnicos" role="tabpanel" aria-labelledby="tab-btn-tecnicos" tabindex="0">
 
   <div class="panel p-5 mb-6">
     <h3 class="text-sm font-semibold text-slate-800 mb-4">Productividad por Técnico</h3>
@@ -299,7 +316,7 @@
 </div>
 
 <!-- ============= TAB 3: REINCIDENCIA Y CALIDAD ============= -->
-<div class="tab-content" id="tab-reincidencia">
+<div class="tab-content" id="tab-reincidencia" role="tabpanel" aria-labelledby="tab-btn-reincidencia" tabindex="0">
 
   <div class="alert-box mb-6" id="alert-box">
     <div class="flex items-start gap-4">
@@ -369,7 +386,7 @@
 </div>
 
 <!-- ============= TAB 4: ANÁLISIS DE TIEMPOS ============= -->
-<div class="tab-content" id="tab-tiempos">
+<div class="tab-content" id="tab-tiempos" role="tabpanel" aria-labelledby="tab-btn-tiempos" tabindex="0">
 
   <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-start gap-3">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2" class="flex-shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
