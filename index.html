@@ -127,7 +127,10 @@
       <input id="sheet-url" type="text" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0  ó  https://script.google.com/macros/s/.../exec">
       <button onclick="saveSource()">Guardar y actualizar</button>
       <button onclick="closeSourceConfig()" style="background:#94a3b8;">Cancelar</button>
-      <a href="README_PROXY.md" target="_blank" style="margin-left:auto; color:#854d0e; text-decoration:underline;">¿Cómo configurar el proxy? →</a>
+      <a href="README_PROXY.md" target="_blank" rel="noopener noreferrer" style="margin-left:auto; color:#854d0e; text-decoration:underline;">¿Cómo configurar el proxy? →</a>
+    </div>
+    <div class="max-w-[1500px] mx-auto px-4 md:px-8">
+      <div id="source-config-error" role="alert" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; background:#fee2e2; color:#991b1b; border-radius:6px; font-size:0.85rem;"></div>
     </div>
   </div>
 
@@ -480,14 +483,45 @@ function openSourceConfig() {
   }
 }
 function closeSourceConfig() { document.getElementById('source-config').style.display = 'none'; }
+
+// Valida que una URL sea segura para usar como fuente de datos:
+//   - debe parsear como URL válida
+//   - debe usar protocolo http o https (rechaza javascript:, data:, file:, etc.)
+//   - el host debe estar presente
+function isValidSourceUrl(url) {
+  try {
+    const u = new URL(url);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && !!u.hostname;
+  } catch (e) {
+    return false;
+  }
+}
+
 function saveSource() {
   const url = document.getElementById('sheet-url').value.trim();
   if (url) {
-    localStorage.setItem('kpi_sheet_url', url);
+    if (!isValidSourceUrl(url)) {
+      // Mostrar error inline en el panel de config
+      const errEl = document.getElementById('source-config-error');
+      if (errEl) {
+        errEl.textContent = 'URL inválida. Debe empezar con http:// o https://';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
+    try {
+      localStorage.setItem('kpi_sheet_url', url);
+    } catch (e) {
+      // localStorage puede estar deshabilitado (modo privado iOS, políticas enterprise)
+      console.warn('No se pudo guardar en localStorage:', e);
+    }
   } else {
     // Si el usuario borra el campo y guarda, vuelve al default hardcodeado
-    localStorage.removeItem('kpi_sheet_url');
+    try { localStorage.removeItem('kpi_sheet_url'); } catch (e) {}
   }
+  // Limpiar error si existía
+  const errEl = document.getElementById('source-config-error');
+  if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
   closeSourceConfig();
   loadData(true);
 }
@@ -560,6 +594,11 @@ async function loadData(force = false) {
         const resp = await fetchWithRetry(freshUrl, { cache: 'no-store', signal: controller.signal }, 3);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const csvText = await resp.text();
+        // Detectar respuesta no-CSV (ej. página de login de Google). Si llega HTML,
+        // no parsear — tratar como error para activar fallback.
+        if (/^\s*<(?:!DOCTYPE|html|HTML)/i.test(csvText)) {
+          throw new Error('Respuesta no es CSV (parece HTML — posible login o proxy caído)');
+        }
         const parsed = parseCsvWithMetadata(csvText);
 
         // Verificar que esta sigue siendo la carga más reciente
@@ -583,6 +622,9 @@ async function loadData(force = false) {
           const resp = await fetch(freshUrl, { cache: 'no-store', signal: controller.signal });
           if (!resp.ok) throw new Error('HTTP ' + resp.status);
           const csvText = await resp.text();
+          if (/^\s*<(?:!DOCTYPE|html|HTML)/i.test(csvText)) {
+            throw new Error('Respuesta no es CSV (parece HTML)');
+          }
           const parsed = parseCsvWithMetadata(csvText);
 
           if (myGen !== currentLoadGen) return;
@@ -669,8 +711,44 @@ const NUMERIC_COLS = ['Reincidencia_Equipo', 'Días_Trabajados', 'Horas_Trabajad
 function toNumberOrNull(val) {
   if (val === '' || val === null || val === undefined) return null;
   if (typeof val === 'number') return isFinite(val) ? val : null;
-  // Soporta coma decimal chilena: "8,5" → 8.5
-  const n = Number(String(val).trim().replace(',', '.'));
+  const s = String(val).trim();
+  if (!s) return null;
+  // Detectar formato con separadores (coma/punto). Lógica:
+  //   - Si tiene ambos (, y .): el ÚLTIMO es el decimal, el otro es separador de miles.
+  //     Chile: "1.234,56" → 1234.56   Inglés: "1,234.56" → 1234.56
+  //   - Si solo tiene coma: decimal chileno → "8,5" → 8.5
+  //   - Si solo tiene punto: decimal inglés → "8.5" → 8.5
+  //   - Validación: la "parte de miles" debe tener exactamente 3 dígitos (si no,
+  //     se asume que es decimal simple).
+  let normalized = s;
+  const hasComma = s.indexOf(',') !== -1;
+  const hasDot = s.indexOf('.') !== -1;
+  if (hasComma && hasDot) {
+    const lastComma = s.lastIndexOf(',');
+    const lastDot = s.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      // Chileno: "1.234,56" → quitar puntos, coma → punto
+      normalized = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Inglés: "1,234.56" → quitar comas
+      normalized = s.replace(/,/g, '');
+    }
+  } else if (hasComma) {
+    // Posible decimal chileno o separador de miles inglés.
+    // Si después de la coma hay exactamente 3 dígitos y solo una coma, es miles inglés.
+    // Si hay 1-2 dígitos, es decimal chileno.
+    const parts = s.split(',');
+    if (parts.length === 2 && parts[1].length === 3 && /^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
+      // Probable miles inglés: "1,234" → 1234
+      normalized = s.replace(',', '');
+    } else {
+      // Decimal chileno: "8,5" → 8.5
+      normalized = s.replace(',', '.');
+    }
+  }
+  // Si queda algún caracter no numérico (excepto signo y exponente), descartar.
+  if (!/^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(normalized)) return null;
+  const n = Number(normalized);
   return isNaN(n) ? null : n;
 }
 
@@ -680,7 +758,14 @@ function normalizeRow(row) {
     if (NUMERIC_COLS.indexOf(key) !== -1) {
       out[key] = toNumberOrNull(row[key]);
     } else {
-      out[key] = row[key] == null ? '' : row[key];
+      // Strings: trim para evitar duplicados en filtros (" Juan " vs "Juan").
+      // Si row[key] es null/undefined → ''.
+      if (row[key] == null) {
+        out[key] = '';
+      } else {
+        const trimmed = String(row[key]).trim();
+        out[key] = trimmed;
+      }
     }
   }
   return out;
@@ -858,14 +943,26 @@ function renderKPIs() {
   document.getElementById('kpi-criticos-2').textContent = criticos;
   document.getElementById('kpi-criticos-2-sub').textContent = totalEquipos ? `${(criticos*100/totalEquipos).toFixed(1)}% foco prioritario` : '—';
 
-  // Alert box
+  // Alert box — XSS-safe: usa textContent + createElement en vez de innerHTML
+  // para que valores del Sheet (cliente, equipo) nunca ejecuten HTML/JS.
   const equipoMasCritico = Object.entries(equiposCounts).sort((a,b) => b[1] - a[1])[0];
   if (equipoMasCritico && equipoMasCritico[1] >= 4) {
     const eq = equipoMasCritico[0];
     const reinc = equipoMasCritico[1];
     const cliente = FILTERED.find(r => r['Equipo'] == eq && r['Cliente'])?.['Cliente'] || 'Sin cliente';
     document.getElementById('alert-title').textContent = `Equipo ${eq} — ${cliente}: foco crítico de reincidencia`;
-    document.getElementById('alert-text').innerHTML = `Ha requerido <strong>${reinc} visitas</strong>. Concentra <strong>${(reinc*100/total).toFixed(1)}%</strong> de toda la actividad técnica. Evaluar mantenimiento profundo o reemplazo.`;
+    // Construcción segura del DOM (sin innerHTML)
+    const alertText = document.getElementById('alert-text');
+    alertText.textContent = '';
+    alertText.appendChild(document.createTextNode('Ha requerido '));
+    const b1 = document.createElement('strong');
+    b1.textContent = `${reinc} visitas`;
+    alertText.appendChild(b1);
+    alertText.appendChild(document.createTextNode('. Concentra '));
+    const b2 = document.createElement('strong');
+    b2.textContent = `${(reinc*100/total).toFixed(1)}%`;
+    alertText.appendChild(b2);
+    alertText.appendChild(document.createTextNode(' de toda la actividad técnica. Evaluar mantenimiento profundo o reemplazo.'));
   } else {
     document.getElementById('alert-box').style.display = 'none';
   }
