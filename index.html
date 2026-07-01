@@ -97,6 +97,20 @@
     /* source-config input ocupa todo el ancho en móvil */
     .source-config input { width: 100% !important; max-width: 320px; }
   }
+
+  /* === SKELETONS (loading state) === */
+  .skeleton { background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%); background-size: 200% 100%; animation: skeleton-shimmer 1.5s ease-in-out infinite; border-radius: 6px; }
+  @keyframes skeleton-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .skeleton-line { height: 12px; margin: 8px 0; }
+  .skeleton-line.lg { height: 28px; }
+  .skeleton-block { height: 200px; margin: 12px 0; border-radius: 8px; }
+
+  /* === EMPTY STATES === */
+  .empty-state { padding: 3rem 1.5rem; text-align: center; color: #64748b; }
+  .empty-state-icon { font-size: 3rem; margin-bottom: 0.5rem; opacity: 0.5; }
+  .empty-state-title { font-size: 1rem; font-weight: 600; color: #475569; margin-bottom: 0.25rem; }
+  .empty-state-text { font-size: 0.875rem; color: #64748b; }
+</style>
 </style>
 </head>
 <body class="min-h-screen">
@@ -128,6 +142,11 @@
       <button id="refresh-btn" onclick="loadData(true)" aria-label="Actualizar datos manualmente" class="slicer flex items-center gap-2">
         <svg id="refresh-icon" aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6"/><path d="M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3"/><path d="M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
         <span>Actualizar</span>
+      </button>
+      <button onclick="exportFilteredCSV()" aria-label="Exportar datos filtrados a CSV" class="slicer flex items-center gap-2">
+        <svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="hidden sm:inline">Exportar CSV</span>
+        <span class="sm:hidden">CSV</span>
       </button>
       <button onclick="openSourceConfig()" aria-label="Configurar fuente de datos" class="slicer flex items-center gap-2">
         <svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -188,7 +207,7 @@
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
     <div class="kpi-card p-5">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Actividades</span>
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide" title="Número total de actividades registradas en el período seleccionado (OTs + Informes Terreno)">Total Actividades</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       </div>
       <div class="text-3xl font-bold text-slate-900" id="kpi-total">—</div>
@@ -197,7 +216,7 @@
 
     <div class="kpi-card p-5">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">% Preventivas</span>
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide" title="Porcentaje de actividades de mantenimiento preventivo (planificado) sobre el total">% Preventivas</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       </div>
       <div class="text-3xl font-bold text-emerald-600" id="kpi-preventivas">—</div>
@@ -206,7 +225,7 @@
 
     <div class="kpi-card p-5">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">% Correctivas</span>
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide" title="Porcentaje de actividades correctivas (reparación de falla). Un % alto indica problemas de mantenimiento">% Correctivas</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
       </div>
       <div class="text-3xl font-bold text-amber-600" id="kpi-correctivas">—</div>
@@ -215,7 +234,7 @@
 
     <div class="kpi-card p-5">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Reincidencia Promedio</span>
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wide" title="Promedio de visitas que cada equipo ha requerido al servicio técnico. Mayor a 3 indica equipo con problemas recurrentes">Reincidencia Promedio</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M21.5 2v6h-6"/><path d="M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3"/><path d="M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
       </div>
       <div class="text-3xl font-bold text-rose-600" id="kpi-reinc">—</div>
@@ -224,7 +243,7 @@
 
     <div class="kpi-card p-5 border-rose-200 bg-rose-50/30">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-medium text-rose-700 uppercase tracking-wide">🚨 Equipos Críticos</span>
+        <span class="text-xs font-medium text-rose-700 uppercase tracking-wide" title="Cantidad de equipos únicos con 4 o más visitas técnicas. Candidatos a mantenimiento profundo o reemplazo">🚨 Equipos Críticos</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </div>
       <div class="text-3xl font-bold text-rose-700" id="kpi-criticos">—</div>
@@ -397,19 +416,19 @@
 
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
     <div class="kpi-card p-5">
-      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">OTs Taller Analizadas</span>
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide" title="Cantidad de Órdenes de Trabajo de taller en el período seleccionado">OTs Taller Analizadas</span>
       <div class="text-3xl font-bold text-slate-900 mt-2" id="kpi-ots">—</div>
     </div>
     <div class="kpi-card p-5">
-      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Duración Promedio</span>
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide" title="Promedio de días que toma completar una OT de taller">Duración Promedio</span>
       <div class="text-3xl font-bold text-blue-600 mt-2" id="kpi-duracion">—</div>
     </div>
     <div class="kpi-card p-5">
-      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Horas Promedio</span>
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide" title="Promedio de horas técnicas trabajadas por OT">Horas Promedio</span>
       <div class="text-3xl font-bold text-blue-600 mt-2" id="kpi-horas">—</div>
     </div>
     <div class="kpi-card p-5">
-      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide">OT más larga</span>
+      <span class="text-xs font-medium text-slate-500 uppercase tracking-wide" title="La OT de taller que más días tomó en completarse. Útil para detectar cuellos de botella">OT más larga</span>
       <div class="text-3xl font-bold text-rose-600 mt-2" id="kpi-ot-larga">—</div>
       <div class="text-xs text-slate-500 mt-1" id="kpi-ot-larga-sub">—</div>
     </div>
@@ -566,9 +585,11 @@ async function loadData(force = false) {
     return;
   }
 
-  // Cancelar carga anterior si existe (cuando force=true o hay otra pendiente)
-  if (currentLoadController) {
-    try { currentLoadController.abort(); } catch (e) {}
+  // Circuit breaker: si está abierto y NO es forzado (botón manual del usuario),
+  // no intentar. El usuario puede forzar con el botón "Actualizar".
+  if (!force && isCircuitOpen()) {
+    console.warn('Circuit breaker abierto. Usa el botón Actualizar para reintentar.');
+    return;
   }
 
   const controller = new AbortController();
@@ -586,6 +607,9 @@ async function loadData(force = false) {
     refreshBtn.disabled = true;
     if (refreshBtnText) refreshBtnText.textContent = 'Cargando...';
   }
+
+  // Mostrar skeletons en la primera carga (cuando RAW_DATA está vacío)
+  if (RAW_DATA.length === 0) showSkeletons();
 
   const cleanup = () => {
     // Solo el más reciente resetea el estado
@@ -624,6 +648,7 @@ async function loadData(force = false) {
         RAW_DATA = parsed.data;
         updateStatusFromLoad_(parsed, 'live');
         loaded = true;
+        recordLoadSuccess();
       } catch (err) {
         if (err.name === 'AbortError') return;
         console.warn('Primer intento falló:', err);
@@ -649,6 +674,7 @@ async function loadData(force = false) {
           RAW_DATA = parsed.data;
           updateStatusFromLoad_(parsed, 'live');
           loaded = true;
+          recordLoadSuccess();
         } catch (err2) {
           if (err2.name === 'AbortError') return;
           console.error('Segundo intento falló:', err2);
@@ -658,6 +684,8 @@ async function loadData(force = false) {
         if (myGen !== currentLoadGen) return;
         document.getElementById('data-status').textContent = '⚠ Error al cargar fuente, usando datos locales';
         await loadFallback();
+        // loadFallback también es un fallo en la lógica del circuit breaker
+        recordLoadError();
       }
     } else if (RAW_DATA.length === 0) {
       await loadFallback();
@@ -672,6 +700,7 @@ async function loadData(force = false) {
   } catch (err) {
     if (err.name !== 'AbortError') console.error('Error en loadData:', err);
   } finally {
+    hideSkeletons();
     cleanup();
   }
 }
@@ -697,15 +726,33 @@ function updateStatusFromLoad_(parsed, source) {
 
 // Helper: fetch con retry exponencial (solo para errores de red / 5xx)
 // Si la señal se aborta (AbortController), termina inmediatamente sin reintentar.
+// Timeout configurable (default 25s — Apps Script puede tardar 5-10s en cold start)
+// Si llega antes, la petición se aborta como timeout (no retry).
+const FETCH_TIMEOUT_MS = 25000;
+
 async function fetchWithRetry(url, options, maxRetries) {
   let lastErr;
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const resp = await fetch(url, options);
-      // 2xx → éxito; 4xx → no retry (error de config); 5xx → retry
-      if (resp.ok) return resp;
-      if (resp.status >= 400 && resp.status < 500) return resp;
-      lastErr = new Error('HTTP ' + resp.status);
+      // Combinar el signal del caller con un timeout interno
+      const timeoutController = new AbortController();
+      const timeoutId = setTimeout(() => timeoutController.abort(new Error('Timeout')), FETCH_TIMEOUT_MS);
+      // Si el caller pasa signal, propagar el abort
+      if (options.signal) {
+        options.signal.addEventListener('abort', () => timeoutController.abort(options.signal.reason));
+      }
+      try {
+        const resp = await fetch(url, { ...options, signal: timeoutController.signal });
+        clearTimeout(timeoutId);
+        // 2xx → éxito; 4xx → no retry (error de config); 5xx → retry
+        if (resp.ok) return resp;
+        if (resp.status >= 400 && resp.status < 500) return resp;
+        lastErr = new Error('HTTP ' + resp.status);
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') throw err;
+        lastErr = err;
+      }
     } catch (err) {
       // Si fue abortado, propagar inmediatamente sin retry
       if (err.name === 'AbortError') throw err;
@@ -717,6 +764,52 @@ async function fetchWithRetry(url, options, maxRetries) {
     }
   }
   throw lastErr;
+}
+
+// ============ CIRCUIT BREAKER ============
+// Tras N errores consecutivos, pausa el auto-refresh para evitar:
+//   - Quemar la cuota de Apps Script (límite de ejecuciones/día)
+//   - Bombardear al usuario con reintentos fallidos
+// El usuario puede reintentar manualmente con el botón "Actualizar".
+const CIRCUIT_BREAKER_THRESHOLD = 3; // errores consecutivos para abrir
+const CIRCUIT_BREAKER_RESET_MS = 60000; // 1 minuto antes de reintentar auto-refresh
+let consecutiveErrors = 0;
+let circuitOpenedAt = 0;
+
+function recordLoadSuccess() {
+  consecutiveErrors = 0;
+  circuitOpenedAt = 0;
+}
+
+function recordLoadError() {
+  consecutiveErrors++;
+  if (consecutiveErrors >= CIRCUIT_BREAKER_THRESHOLD) {
+    circuitOpenedAt = Date.now();
+    console.warn(`Circuit breaker abierto tras ${consecutiveErrors} errores. Auto-refresh pausado por ${CIRCUIT_BREAKER_RESET_MS/1000}s.`);
+    // Mostrar banner de aviso al usuario
+    showCircuitBreakerBanner();
+  }
+}
+
+function isCircuitOpen() {
+  if (circuitOpenedAt === 0) return false;
+  const elapsed = Date.now() - circuitOpenedAt;
+  if (elapsed > CIRCUIT_BREAKER_RESET_MS) {
+    // Reset: intentar de nuevo
+    circuitOpenedAt = 0;
+    consecutiveErrors = 0;
+    return false;
+  }
+  return true;
+}
+
+function showCircuitBreakerBanner() {
+  const status = document.getElementById('data-status');
+  if (status) {
+    status.textContent = `⚠ Auto-refresh pausado: ${consecutiveErrors} errores consecutivos. Pulsa Actualizar para reintentar.`;
+    status.parentElement.style.background = '#fef3c7';
+    status.parentElement.style.borderColor = '#fbbf24';
+  }
 }
 
 // Helper: parsea CSV y extrae metadata de Apps Script si está presente
@@ -911,12 +1004,105 @@ function resetFilters() {
   applyFilters();
 }
 
+// ============ EXPORT CSV ============
+// Exporta los datos visibles (filtrados) a un archivo CSV descargable.
+// Usa RFC 4180 para escapar comillas y comas dentro de campos.
+function exportFilteredCSV() {
+  if (!FILTERED || FILTERED.length === 0) {
+    alert('No hay datos para exportar.');
+    return;
+  }
+  // Obtener headers del primer registro (preservar orden)
+  const headers = Object.keys(FILTERED[0]);
+  const escapeCSV = (val) => {
+    if (val == null) return '';
+    const s = String(val);
+    if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+  const csvLines = [
+    headers.map(escapeCSV).join(','),
+    ...FILTERED.map(row => headers.map(h => escapeCSV(row[h])).join(','))
+  ];
+  const csv = '﻿' + csvLines.join('\n'); // BOM para que Excel reconozca UTF-8
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  a.href = url;
+  a.download = `licman-kpi-${now}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
 // ============ RENDER ALL ============
 function renderAll() {
-  if (FILTERED.length === 0) return;
+  if (FILTERED.length === 0) {
+    showEmptyState();
+    return;
+  }
+  hideEmptyState();
   renderKPIs();
   renderCharts();
   renderTables();
+}
+
+// Muestra skeletons mientras se cargan datos (primer load)
+function showSkeletons() {
+  // Solo la primera vez (no en refresh)
+  if (RAW_DATA.length > 0) return;
+  // Ocultar empty-state si existe
+  hideEmptyState();
+  // Insertar skeletons en cada tab panel
+  const panels = document.querySelectorAll('.tab-content');
+  panels.forEach(panel => {
+    if (panel.querySelector('.skeleton-placeholder')) return; // ya tiene
+    const placeholder = document.createElement('div');
+    placeholder.className = 'skeleton-placeholder';
+    placeholder.setAttribute('aria-hidden', 'true');
+    placeholder.innerHTML = `
+      <div class="empty-state" style="padding:4rem 1.5rem;">
+        <div class="skeleton skeleton-block" style="max-width:280px; margin:0 auto 1rem;"></div>
+        <div class="skeleton skeleton-line lg" style="width:60%; margin:0.5rem auto;"></div>
+        <div class="skeleton skeleton-line" style="width:80%; margin:0.5rem auto;"></div>
+        <div class="empty-state-text" style="margin-top:1rem;">Cargando datos...</div>
+      </div>`;
+    panel.insertBefore(placeholder, panel.firstChild);
+  });
+}
+
+function hideSkeletons() {
+  document.querySelectorAll('.skeleton-placeholder').forEach(p => p.remove());
+}
+
+function showEmptyState() {
+  // Mostrar empty state solo si hay datos crudos pero los filtros los excluyen todos.
+  // Si RAW_DATA está vacío, mostrar mensaje diferente.
+  const existing = document.getElementById('empty-state-banner');
+  if (existing) return; // ya está
+  const banner = document.createElement('div');
+  banner.id = 'empty-state-banner';
+  banner.setAttribute('role', 'status');
+  banner.setAttribute('aria-live', 'polite');
+  if (RAW_DATA.length === 0) {
+    banner.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No hay datos cargados</div><div class="empty-state-text">Verifica tu conexión o configura la fuente de datos.</div></div>';
+  } else {
+    banner.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">Sin resultados para los filtros aplicados</div><div class="empty-state-text">${FILTERED.length} de ${RAW_DATA.length} registros. Prueba a limpiar los filtros.</div></div>`;
+  }
+  // Insertar antes del primer grid de KPIs
+  const firstGrid = document.querySelector('#tab-resumen .grid');
+  if (firstGrid && firstGrid.parentElement) {
+    firstGrid.parentElement.insertBefore(banner, firstGrid);
+  }
+}
+
+function hideEmptyState() {
+  const existing = document.getElementById('empty-state-banner');
+  if (existing) existing.remove();
 }
 
 // ============ KPIs ============
@@ -1000,36 +1186,51 @@ function renderKPIs() {
 }
 
 // ============ CHARTS ============
-function destroyChart(id) { if (CHARTS[id]) { CHARTS[id].destroy(); CHARTS[id] = null; } }
+// Performance: actualiza in-place cuando es posible, crea solo si el tipo cambió.
+// Antes: destroy + new Chart() en cada render (11 charts × ~50-200ms = 0.5-2.2s perdidos).
+// Ahora: chart.update() reutiliza el chart existente (~10-30ms).
+function updateOrCreateChart(id, configFactory) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const existing = CHARTS[id];
+  if (existing && existing.config.type === configFactory().type) {
+    // Reutilizar: solo actualizar data
+    const newConfig = configFactory();
+    existing.data = newConfig.data;
+    if (newConfig.options) existing.options = newConfig.options;
+    existing.update();
+  } else {
+    // Tipo cambió (o primera vez): destruir y crear
+    if (existing) existing.destroy();
+    CHARTS[id] = new Chart(canvas, configFactory());
+  }
+}
 
 function renderCharts() {
   // Tipo trabajo
-  destroyChart('chart-tipo');
   const tipoCount = {};
   FILTERED.forEach(r => { const t = r['Tipo_Trabajo_Final']; if (t) tipoCount[t] = (tipoCount[t]||0)+1; });
   document.getElementById('kpi-tipo-total').textContent = `Total: ${FILTERED.length}`;
-  CHARTS['chart-tipo'] = new Chart(document.getElementById('chart-tipo'), {
+  updateOrCreateChart('chart-tipo', () => ({
     type: 'doughnut',
     data: {
       labels: Object.keys(tipoCount),
       datasets: [{ data: Object.values(tipoCount), backgroundColor: ['#f59e0b', '#3b82f6', '#10b981', '#94a3b8', '#06b6d4'], borderWidth: 0 }]
     },
     options: { cutout: '65%', plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 12 } } } } }
-  });
+  }));
 
   // Tecnicos
-  destroyChart('chart-tecnicos');
   const tecCount = {};
   FILTERED.forEach(r => { const t = r['Técnico']; if (t) tecCount[t] = (tecCount[t]||0)+1; });
   const tecSorted = Object.entries(tecCount).sort((a,b) => b[1]-a[1]);
-  CHARTS['chart-tecnicos'] = new Chart(document.getElementById('chart-tecnicos'), {
+  updateOrCreateChart('chart-tecnicos', () => ({
     type: 'bar',
     data: { labels: tecSorted.map(t => t[0]), datasets: [{ label: 'Total', data: tecSorted.map(t => t[1]), backgroundColor: '#3b82f6', borderRadius: 6 }] },
     options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } } } }
-  });
+  }));
 
   // Mensual
-  destroyChart('chart-mensual');
   const monthCounts = {};
   FILTERED.forEach(r => {
     const fecha = r['Fecha_Servicio'] || r['Fecha_Inicio'];
@@ -1043,7 +1244,7 @@ function renderCharts() {
     }
   });
   const sortedMonths = Object.entries(monthCounts).sort((a,b) => a[0].localeCompare(b[0]));
-  CHARTS['chart-mensual'] = new Chart(document.getElementById('chart-mensual'), {
+  updateOrCreateChart('chart-mensual', () => ({
     type: 'line',
     data: {
       labels: sortedMonths.map(m => m[1].label),
@@ -1053,35 +1254,32 @@ function renderCharts() {
       ]
     },
     options: { plugins: { legend: { position: 'top', align: 'end' } }, scales: { y: { beginAtZero: true } } }
-  });
+  }));
 
   // Fallas
-  destroyChart('chart-fallas');
   const fallaCount = {};
   FILTERED.forEach(r => { const f = r['Tipo_Falla_Final']; if (f) fallaCount[f] = (fallaCount[f]||0)+1; });
   document.getElementById('kpi-fallas-total').textContent = `Total: ${FILTERED.length}`;
-  CHARTS['chart-fallas'] = new Chart(document.getElementById('chart-fallas'), {
+  updateOrCreateChart('chart-fallas', () => ({
     type: 'bar',
     data: {
       labels: Object.keys(fallaCount),
       datasets: [{ data: Object.values(fallaCount), backgroundColor: ['#3b82f6', '#06b6d4', '#94a3b8', '#f59e0b', '#ef4444'], borderRadius: 6 }]
     },
     options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-  });
+  }));
 
   // Clientes top 8
-  destroyChart('chart-clientes');
   const cliCount = {};
   FILTERED.forEach(r => { if (r['Fuente'] === 'Informe Terreno' && r['Cliente']) cliCount[r['Cliente']] = (cliCount[r['Cliente']]||0)+1; });
   const cliSorted = Object.entries(cliCount).sort((a,b) => b[1]-a[1]).slice(0,8);
-  CHARTS['chart-clientes'] = new Chart(document.getElementById('chart-clientes'), {
+  updateOrCreateChart('chart-clientes', () => ({
     type: 'bar',
     data: { labels: cliSorted.map(c => c[0]), datasets: [{ data: cliSorted.map(c => c[1]), backgroundColor: '#6366f1', borderRadius: 6 }] },
     options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-  });
+  }));
 
   // Mix
-  destroyChart('chart-mix');
   const tecTipos = {};
   FILTERED.forEach(r => {
     const t = r['Técnico']; const tipo = r['Tipo_Trabajo_Final'];
@@ -1091,7 +1289,7 @@ function renderCharts() {
     }
   });
   const tecTop5 = Object.entries(tecTipos).map(([k,v]) => ({k, total: safeSum(Object.values(v)), ...v})).sort((a,b) => b.total - a.total).slice(0,5);
-  CHARTS['chart-mix'] = new Chart(document.getElementById('chart-mix'), {
+  updateOrCreateChart('chart-mix', () => ({
     type: 'bar',
     data: {
       labels: tecTop5.map(t => t.k),
@@ -1102,10 +1300,9 @@ function renderCharts() {
       ]
     },
     options: { plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true } } }
-  });
+  }));
 
   // Estado por técnico
-  destroyChart('chart-estado');
   const tecEstado = {};
   FILTERED.forEach(r => {
     const t = r['Técnico']; const est = r['Estado_Final'];
@@ -1115,7 +1312,7 @@ function renderCharts() {
     }
   });
   const tecEstadoTop = Object.entries(tecEstado).map(([k,v]) => ({k, total: safeSum(Object.values(v)), ...v})).sort((a,b) => b.total - a.total).slice(0,5);
-  CHARTS['chart-estado'] = new Chart(document.getElementById('chart-estado'), {
+  updateOrCreateChart('chart-estado', () => ({
     type: 'bar',
     data: {
       labels: tecEstadoTop.map(t => t.k),
@@ -1126,10 +1323,9 @@ function renderCharts() {
       ]
     },
     options: { plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true } } }
-  });
+  }));
 
   // Reinc cliente
-  destroyChart('chart-reinc-cliente');
   const cliReinc = {};
   FILTERED.forEach(r => {
     if (r['Cliente'] && r['Reincidencia_Equipo']) {
@@ -1138,7 +1334,7 @@ function renderCharts() {
     }
   });
   const cliReincArr = Object.entries(cliReinc).filter(([k,v]) => v >= 2).sort((a,b) => b[1]-a[1]).slice(0,10);
-  CHARTS['chart-reinc-cliente'] = new Chart(document.getElementById('chart-reinc-cliente'), {
+  updateOrCreateChart('chart-reinc-cliente', () => ({
     type: 'bar',
     data: {
       labels: cliReincArr.map(c => c[0]),
@@ -1149,26 +1345,24 @@ function renderCharts() {
       }]
     },
     options: { indexAxis: 'y', plugins: { legend: { display: false } } }
-  });
+  }));
 
   // Fallas críticas
-  destroyChart('chart-fallas-criticas');
   const equiposCriticosSet = new Set(FILTERED.filter(r => r['Reincidencia_Equipo'] >= 4).map(r => r['Equipo']));
   const fallasCriticas = {};
   FILTERED.filter(r => equiposCriticosSet.has(r['Equipo']) && r['Tipo_Falla_Final']).forEach(r => {
     fallasCriticas[r['Tipo_Falla_Final']] = (fallasCriticas[r['Tipo_Falla_Final']]||0)+1;
   });
-  CHARTS['chart-fallas-criticas'] = new Chart(document.getElementById('chart-fallas-criticas'), {
+  updateOrCreateChart('chart-fallas-criticas', () => ({
     type: 'doughnut',
     data: {
       labels: Object.keys(fallasCriticas),
       datasets: [{ data: Object.values(fallasCriticas), backgroundColor: ['#3b82f6', '#06b6d4', '#f59e0b', '#ef4444', '#94a3b8'], borderWidth: 0 }]
     },
     options: { cutout: '60%', plugins: { legend: { position: 'bottom' } } }
-  });
+  }));
 
   // Duración por técnico
-  destroyChart('chart-duracion');
   const tecDur = {};
   FILTERED.filter(r => r['Fuente'] === 'OT Taller' && r['Técnico']).forEach(r => {
     if (!tecDur[r['Técnico']]) tecDur[r['Técnico']] = { dias: [], horas: [] };
@@ -1180,7 +1374,7 @@ function renderCharts() {
     dias: v.dias.length ? safeSum(v.dias)/v.dias.length : 0,
     horas: v.horas.length ? safeSum(v.horas)/v.horas.length : 0,
   })).filter(t => t.dias > 0);
-  CHARTS['chart-duracion'] = new Chart(document.getElementById('chart-duracion'), {
+  updateOrCreateChart('chart-duracion', () => ({
     type: 'bar',
     data: {
       labels: tecDurArr.map(t => t.k),
@@ -1193,10 +1387,9 @@ function renderCharts() {
       plugins: { legend: { position: 'bottom' } },
       scales: { y: { position: 'left', title: { display: true, text: 'Días' } }, y1: { position: 'right', title: { display: true, text: 'Horas' }, grid: { drawOnChartArea: false } } }
     }
-  });
+  }));
 
   // Distribución duración
-  destroyChart('chart-dist-duracion');
   const distDur = { '1 día': 0, '2 días': 0, '3 días': 0, '4 días': 0, '5+ días': 0 };
   FILTERED.filter(r => r['Fuente'] === 'OT Taller' && r['Días_Trabajados'] != null).forEach(r => {
     const d = r['Días_Trabajados'];
@@ -1206,14 +1399,14 @@ function renderCharts() {
     else if (d === 4) distDur['4 días']++;
     else distDur['5+ días']++;
   });
-  CHARTS['chart-dist-duracion'] = new Chart(document.getElementById('chart-dist-duracion'), {
+  updateOrCreateChart('chart-dist-duracion', () => ({
     type: 'bar',
     data: {
       labels: Object.keys(distDur),
       datasets: [{ data: Object.values(distDur), backgroundColor: ['#10b981', '#10b981', '#3b82f6', '#f59e0b', '#ef4444'], borderRadius: 6 }]
     },
     options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-  });
+  }));
 }
 
 // ============ TABLES ============
@@ -1307,8 +1500,72 @@ function renderTables() {
 // Si usas el Apps Script Proxy, este intervalo es seguro: el proxy lee
 // el Sheet en cada request y entrega datos frescos.
 // El guard !isLoading evita disparar una carga si ya hay una en curso.
-// Para desactivar, comenta la siguiente línea.
-setInterval(() => { if (RAW_DATA.length > 0 && !isLoading) loadData(true); }, 120000);
+// Pausa cuando la pestaña está oculta (Visibility API) para ahorrar batería
+// y cuota de Apps Script. Al volver a la pestaña, refresca inmediato.
+// Para desactivar, comenta las llamadas a startAutoRefresh() y el listener de visibilitychange.
+let autoRefreshTimer = null;
+let isPageVisible = !document.hidden;
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) return; // ya está corriendo
+  autoRefreshTimer = setInterval(() => {
+    if (RAW_DATA.length > 0 && !isLoading && isPageVisible) {
+      loadData(true);
+    }
+  }, 120000);
+}
+
+function stopAutoRefresh() {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer);
+    autoRefreshTimer = null;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  isPageVisible = !document.hidden;
+  if (isPageVisible && RAW_DATA.length > 0 && !isLoading) {
+    // Refresca inmediata al volver a la pestaña
+    loadData(true);
+  }
+});
+
+startAutoRefresh();
+
+// ============ ONLINE/OFFLINE DETECTION ============
+// Muestra aviso cuando el navegador pierde/recupera conexión.
+// El badge #data-status cambia color y texto según el estado de red.
+function updateOnlineStatus() {
+  const status = document.getElementById('data-status');
+  if (!status) return;
+  const parent = status.parentElement;
+  if (!navigator.onLine) {
+    status.textContent = '⚠ Sin conexión a internet';
+    parent.style.background = '#fee2e2';
+    parent.style.borderColor = '#fecaca';
+    status.style.color = '#991b1b';
+    const dot = parent.querySelector('span:first-child');
+    if (dot) dot.style.background = '#dc2626';
+  } else {
+    // Restaurar estado visual normal
+    parent.style.background = '';
+    parent.style.borderColor = '';
+    status.style.color = '';
+    const dot = parent.querySelector('span:first-child');
+    if (dot) dot.style.background = '';
+    // Si tenemos datos cargados, restaurar mensaje "en vivo"
+    if (RAW_DATA.length > 0) {
+      const localTime = new Date().toLocaleTimeString();
+      status.textContent = `✓ Conexión restaurada · ${RAW_DATA.length} registros · ${localTime}`;
+    }
+  }
+}
+
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// Inicializar estado al cargar
+if (!navigator.onLine) updateOnlineStatus();
 
 // ============ WINDOW RESIZE ============
 // Reajusta los charts cuando se cambia el tamaño de la ventana (rotación móvil, resize desktop)
