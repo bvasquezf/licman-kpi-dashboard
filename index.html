@@ -941,11 +941,39 @@ async function loadFallback() {
 }
 
 // ============ FILTERS ============
+// Calcula el período (mes natural) de una fila a partir de Fecha_Servicio/Fecha_Inicio.
+// Devuelve string formato "Enero 2026" o null si no hay fecha válida.
+const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+function getPeriodoFromRow(row) {
+  const fechaStr = row['Fecha_Servicio'] || row['Fecha_Inicio'];
+  if (!fechaStr) return null;
+  const d = new Date(fechaStr);
+  if (isNaN(d.getTime())) return null;
+  return `${MONTHS_ES[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Devuelve la clave de orden cronológico "YYYY-MM" para un período "Enero 2026".
+function getPeriodoSortKey(periodo) {
+  if (!periodo) return '0000-00';
+  const [mes, anio] = periodo.split(' ');
+  const mesIdx = MONTHS_ES.indexOf(mes);
+  return `${anio}-${String(mesIdx + 1).padStart(2, '0')}`;
+}
+
 function populateFilterOptions() {
   try {
     const tecnicos = [...new Set(RAW_DATA.map(r => r['Técnico']).filter(Boolean))].sort();
     const clientes = [...new Set(RAW_DATA.map(r => r['Cliente']).filter(Boolean))].sort();
-    const periodos = [...new Set(RAW_DATA.map(r => r['Periodo']).filter(Boolean))].sort();
+    // Período calculado desde fecha (no desde columna del Sheet) y ordenado cronológicamente.
+    // Formato: "Enero 2026", "Febrero 2026", etc.
+    const periodosSet = new Set();
+    RAW_DATA.forEach(r => {
+      const p = getPeriodoFromRow(r);
+      if (p) periodosSet.add(p);
+    });
+    const periodos = [...periodosSet].sort((a, b) => getPeriodoSortKey(a).localeCompare(getPeriodoSortKey(b)));
 
     const fillSelect = (id, options, allLabel) => {
       const sel = document.getElementById(id);
@@ -989,7 +1017,11 @@ function applyFilters() {
     if (tecnico && r['Técnico'] !== tecnico) return false;
     if (cliente && r['Cliente'] !== cliente) return false;
     if (fuente && r['Fuente'] !== fuente) return false;
-    if (periodo && r['Periodo'] !== periodo) return false;
+    // Comparar contra período calculado desde fecha, no contra columna cruda del Sheet.
+    if (periodo) {
+      const rowPeriodo = getPeriodoFromRow(r);
+      if (rowPeriodo !== periodo) return false;
+    }
     return true;
   });
 
