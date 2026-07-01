@@ -30,11 +30,13 @@
     #     1. Tailwind CDN (cdn.tailwindcss.com) genera estilos en runtime
     #     2. El HTML tiene atributos inline (onclick="...") que requieren unsafe-inline
     #   Si en el futuro se compila Tailwind localmente, se pueden remover.
-    # - connect-src: solo permitir fetch al proxy de Google y mismo origen
+    # - connect-src: permitir fetch al proxy de Google y mismo origen.
+    #   Apps Script redirige (302) a script.googleusercontent.com para servir
+    #   el contenido, así que ambos dominios deben estar en la lista.
     # - frame-ancestors 'self' reemplaza X-Frame-Options en navegadores modernos
     # - base-uri 'self' previene inyecciones de <base>
     # - form-action 'self' previene formularios apuntando a otros dominios
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://script.google.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cdn.jsdelivr.net https://cdn.tailwindcss.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
 
 # =============================================================
 # Cache control
