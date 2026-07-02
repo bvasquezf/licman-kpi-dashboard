@@ -383,6 +383,7 @@
             <th class="text-right">Visitas</th>
             <th class="text-right">Reincidencia</th>
             <th>Indicador</th>
+            <th class="text-center">Intervalo prom.</th>
             <th class="text-center">Estado</th>
           </tr>
         </thead>
@@ -949,8 +950,8 @@ const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
 function getPeriodoFromRow(row) {
   const fechaStr = row['Fecha_Servicio'] || row['Fecha_Inicio'];
   if (!fechaStr) return null;
-  const d = new Date(fechaStr);
-  if (isNaN(d.getTime())) return null;
+  const d = parseChileanDate(fechaStr);
+  if (!d || isNaN(d.getTime())) return null;
   return `${MONTHS_ES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
@@ -960,6 +961,78 @@ function getPeriodoSortKey(periodo) {
   const [mes, anio] = periodo.split(' ');
   const mesIdx = MONTHS_ES.indexOf(mes);
   return `${anio}-${String(mesIdx + 1).padStart(2, '0')}`;
+}
+
+// ============ DATE PARSING (chileno + ISO fallback) ============
+// Detecta automáticamente el formato de fecha del Sheet.
+// Acepta: DD/MM/YYYY, DD-MM-YYYY, DD/MM/YYYY HH:mm:ss, YYYY-MM-DD, YYYY-MM-DDTHH:mm:ss, etc.
+// Devuelve un objeto Date válido o null si no se puede parsear.
+function parseChileanDate(str) {
+  if (!str || typeof str !== 'string') return null;
+  const s = str.trim();
+  if (!s) return null;
+
+  // Intento 1: Formato chileno DD/MM/YYYY o DD-MM-YYYY (con o sin hora)
+  // Regex: 1-2 dígitos / 1-2 dígitos / 4 dígitos, opcional hora
+  const dmyMatch = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/);
+  if (dmyMatch) {
+    let [, d, m, y, hh, mm, ss] = dmyMatch;
+    d = parseInt(d, 10);
+    m = parseInt(m, 10);
+    y = parseInt(y, 10);
+    // Año de 2 dígitos: 30-99 → 19xx, 00-29 → 20xx
+    if (y < 100) y = y >= 30 ? 1900 + y : 2000 + y;
+    const date = new Date(y, m - 1, d, parseInt(hh || 0, 10), parseInt(mm || 0, 10), parseInt(ss || 0, 10));
+    // Validar que el día/mes sea coherente (evita que 31/02 se acepte)
+    if (date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d) {
+      return date;
+    }
+    return null;
+  }
+
+  // Intento 2: ISO o similar (YYYY-MM-DD...) — fallback al parser nativo
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+
+  return null;
+}
+
+// ============ INTERVALO PROMEDIO ENTRE VISITAS ============
+// Calcula el promedio de días entre visitas consecutivas de un equipo.
+// Devuelve un número (días) o null si hay menos de 2 visitas con fecha válida.
+function getAvgIntervaloForEquipo(rows) {
+  const fechas = rows
+    .map(r => parseChileanDate(r['Fecha_Servicio'] || r['Fecha_Inicio']))
+    .filter(d => d && !isNaN(d.getTime()))
+    .sort((a, b) => a - b);
+  if (fechas.length < 2) return null;
+  const intervalos = [];
+  for (let i = 1; i < fechas.length; i++) {
+    const diffMs = fechas[i] - fechas[i - 1];
+    const diffDias = diffMs / (1000 * 60 * 60 * 24);
+    intervalos.push(diffDias);
+  }
+  return intervalos.reduce((a, b) => a + b, 0) / intervalos.length;
+}
+
+// Devuelve un badge según umbrales: < 7 días → rojo, < 30 → amarillo, ≥ 30 → verde
+function getIntervaloBadge(intervalo) {
+  if (intervalo == null) {
+    return '<span class="badge badge-gray" title="Menos de 2 visitas con fecha — no se puede calcular">—</span>';
+  }
+  const dias = Math.round(intervalo);
+  let clase, label;
+  if (dias < 7) {
+    clase = 'badge-red';
+    label = `${dias} día${dias === 1 ? '' : 's'}`;
+  } else if (dias < 30) {
+    clase = 'badge-amber';
+    label = `${dias} días`;
+  } else {
+    clase = 'badge-green';
+    label = `${dias} días`;
+  }
+  return `<span class="badge ${clase}" title="Promedio entre visitas consecutivas">${label}</span>`;
 }
 
 function populateFilterOptions() {
@@ -1478,15 +1551,19 @@ function renderTables() {
   const eqStats = {};
   FILTERED.forEach(r => {
     const eq = r['Equipo']; if (eq == null) return;
-    if (!eqStats[eq]) eqStats[eq] = { equipo: eq, cliente: r['Cliente'], marca: r['Marca'], visitas: 0, reincMax: 0 };
+    if (!eqStats[eq]) eqStats[eq] = { equipo: eq, cliente: r['Cliente'], marca: r['Marca'], visitas: 0, reincMax: 0, rows: [] };
     eqStats[eq].visitas++;
     if (r['Reincidencia_Equipo'] != null && r['Reincidencia_Equipo'] > eqStats[eq].reincMax) eqStats[eq].reincMax = r['Reincidencia_Equipo'];
+    eqStats[eq].rows.push(r);
   });
   const eqArr = Object.values(eqStats).filter(e => e.reincMax >= 2).sort((a,b) => b.reincMax - a.reincMax).slice(0,10);
   const maxReinc = Math.max(...eqArr.map(e => e.reincMax), 1);
   document.querySelector('#table-reincidencia tbody').innerHTML = eqArr.map(e => {
     const pct = (e.reincMax / maxReinc * 100).toFixed(0);
     const status = e.reincMax >= 4 ? '<span class="badge badge-red">Crítico</span>' : '<span class="badge badge-amber">Alerta</span>';
+    // Calcular intervalo promedio entre visitas consecutivas
+    const intervalo = getAvgIntervaloForEquipo(e.rows);
+    const intervaloBadge = getIntervaloBadge(intervalo);
     return `<tr>
       <td class="font-mono font-semibold">${escapeHtml(e.equipo)}</td>
       <td>${escapeHtml(e.cliente) || '—'}</td>
@@ -1494,6 +1571,7 @@ function renderTables() {
       <td class="text-right font-mono">${e.visitas}</td>
       <td class="text-right font-mono ${e.reincMax >= 4 ? 'text-rose-600 font-bold' : 'text-amber-600'}">${e.reincMax}</td>
       <td><div class="repeating-bar"><div style="width:${pct}%"></div></div></td>
+      <td class="text-center">${intervaloBadge}</td>
       <td class="text-center">${status}</td>
     </tr>`;
   }).join('');
